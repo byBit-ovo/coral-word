@@ -1,0 +1,162 @@
+package llm
+
+import(
+	"log"
+	"context"
+	"errors"
+    "google.golang.org/genai"
+	// "github.com/openai/openai-go/v3"
+	// "github.com/openai/openai-go/v3/option"
+	"github.com/go-deepseek/deepseek"
+	"github.com/go-deepseek/deepseek/request"
+)
+const (
+	DEEP_SEEK = iota
+	GEMINI
+)
+const (
+	WORD_QUERY = iota
+)
+type ModelType int
+var Gemini_api_key string
+var Deepseek_api_key string
+var json_format = `{
+  "word": "expose",
+  "definitions": [
+    {
+      "pos": "vt.",
+      "meaning": [
+		"揭露,揭发",
+		"使暴露",
+		"使处于...作用(或影响)之下",
+		"使面临",
+		"(摄影)使曝光"
+	  ]
+    }
+  ],
+  "derivatives": [
+    "exposed",
+    "exposes",
+    "exposure"
+  ],
+  "exam_tags": [
+    "四级",
+    "六级",
+    "雅思",
+    "考研",
+    "专升本"
+  ],
+  "example": "He threatened to expose the scandal to the public if they didn't pay him.",
+  "example_cn": "他威胁说，如果他们不付钱给他，他就向公众揭露这起丑闻。",
+  "phrases": [
+	{
+		"example": "expose to",
+		"example_cn": [
+			"使...暴露于"，
+			"使...受...影响"
+		]
+	},
+	{
+		"example": "expose a secret",
+		"example_cn": [
+			"揭露秘密"，
+		]
+	}
+  ],
+  "synonyms": [
+    "reveal",
+    "uncover",
+    "disclose",
+    "unmask"
+  ]
+}`
+var prompts = map[int]string{
+	WORD_QUERY: "请以这样的json格式回复我(不要带任何多余符号,标点符号都用英文回复):" + json_format +
+	"列举出该单词的所有词性以及对应的中文释义、10个左右数量的该单词的派生词(派生词" + 
+	"定义为和该单词有几分相似的单词)、该单词是否是四级、六级、雅思、考研、专升本的核心词汇、" +
+	"一条包含该单词的典型例句、" + 
+	"包含该单词的几个典型短语(如果有)、该单词的近义词。本次查询:",
+}
+
+
+
+
+func NewAIModel(modelType ModelType) (AIModel, error){
+	switch modelType{
+	case DEEP_SEEK:
+		client, err := deepseek.NewClient(Deepseek_api_key)
+		if err != nil{
+			return nil, err
+		}
+		return &DeepseekModel{client, Deepseek_api_key}, nil
+	case GEMINI:
+		ctx := context.Background()
+		// The client gets the API key from the environment variable `GEMINI_API_KEY`.
+		client, err := genai.NewClient(ctx, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return &GeminiModel{Gemini_api_key, ctx, client}, nil
+	}
+	return nil, errors.New("Model not found")
+}
+// AIModel defines the interface for querying word definitions
+type AIModel interface {
+    GetDefinition(string) (string, error)
+}
+type DeepseekModel struct{
+	client deepseek.Client
+	api_key string
+}
+type GeminiModel struct{
+	api_key string
+	ctx context.Context
+	client *genai.Client
+}
+
+func (ds *DeepseekModel) GetDefinition(word string) (string, error){
+	chatReq := &request.ChatCompletionsRequest{
+		Model:  deepseek.DEEPSEEK_CHAT_MODEL,
+		Stream: false,
+		Messages: []*request.Message{
+			{
+				Role:    "user",
+				Content: prompts[WORD_QUERY] + word, // set your input message
+			},
+		},
+	}
+	chatResp, err := ds.client.CallChatCompletionsChat(context.Background(), chatReq)
+	if err != nil {
+		return "", err
+	}
+	return chatResp.Choices[0].Message.Content, nil
+}
+func (gemini *GeminiModel)GetDefinition(word string) (string, error){
+
+    result, err := gemini.client.Models.GenerateContent(
+        gemini.ctx,
+        "gemini-2.5-flash",
+        genai.Text(prompts[WORD_QUERY] + word),
+        nil,
+    )
+    if err != nil {
+        log.Fatal(err)
+		return "", err
+    }
+    return result.Text(), nil
+}
+
+
+// client := openai.NewClient(
+// 	option.WithAPIKey(Gemini_api_key), // defaults to os.LookupEnv("OPENAI_API_KEY")
+// )
+// chatCompletion, err := client.Chat.Completions.New(context.TODO(), openai.ChatCompletionNewParams{
+// 	Messages: []openai.ChatCompletionMessageParamUnion{
+// 		openai.UserMessage("今天吃啥"),
+// 	},
+// 	Model: openai.ChatModelGPT5,
+// })
+// if err != nil {
+// 	panic(err.Error())
+// }
+// println(chatCompletion.Choices[0].Message.Content)

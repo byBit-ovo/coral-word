@@ -1,0 +1,50 @@
+{
+  "word": "expose",
+  "definitions": [
+    {
+      "pos": "vt.",
+      "meaning": [
+		"揭露,揭发",
+		"使暴露",
+		"使处于...作用(或影响)之下",
+		"使面临",
+		"(摄影)使曝光"
+	  ]
+    }
+  ],
+  "derivatives": [
+    "exposed",
+    "exposes",
+    "exposure"
+  ],
+  "exam_tags": [
+    "四级",
+    "六级",
+    "雅思",
+    "考研",
+    "专升本"
+  ],
+  "example": "He threatened to expose the scandal to the public if they didn't pay him.",
+  "example_cn": "他威胁说，如果他们不付钱给他，他就向公众揭露这起丑闻。",
+  "phrases": [
+	{
+		"example": "expose to",
+		"example_cn": [
+			"使...暴露于"，
+			"使...受...影响"
+		]
+	},
+	{
+		"example": "expose a secret",
+		"example_cn": [
+			"揭露秘密"，
+		]
+	}
+  ],
+  "synonyms": [
+    "reveal",
+    "uncover",
+    "disclose",
+    "unmask"
+  ]
+}
