@@ -1,6 +1,8 @@
 package llm
 
 import(
+	"os"
+	_"fmt"
 	"log"
 	"context"
 	"errors"
@@ -9,17 +11,44 @@ import(
 	// "github.com/openai/openai-go/v3/option"
 	"github.com/go-deepseek/deepseek"
 	"github.com/go-deepseek/deepseek/request"
+	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
+	volModel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
+	"github.com/volcengine/volcengine-go-sdk/volcengine"
 )
+func InitModels()error{
+	gemini_api_key = os.Getenv("GEMINI_API_KEY")
+	deepseek_api_key = os.Getenv("DEEPSEEK_API_KEY")
+	ark_api_key = os.Getenv("ARK_API_KEY")
+	dpModel, err := newAIModel(DEEP_SEEK)
+	if err != nil{
+		return err
+	}
+	GmModel, err := newAIModel(GEMINI)
+	if err != nil{
+		return err
+	}
+	ArkModel, err := newAIModel(ARK)
+	if err != nil{
+		return err
+	}
+	Models[DEEP_SEEK] = dpModel
+	Models[GEMINI] = GmModel
+	Models[ARK] = ArkModel
+	return nil
+}
+var Models = map[int]AIModel{}
 const (
 	DEEP_SEEK = iota
 	GEMINI
+	ARK
 )
 const (
 	WORD_QUERY = iota
 )
 type ModelType int
-var Gemini_api_key string
-var Deepseek_api_key string
+var gemini_api_key string
+var deepseek_api_key string
+var ark_api_key string
 var json_format = `{
   "word": "expose",
   "definitions": [
@@ -81,14 +110,14 @@ var prompts = map[int]string{
 
 
 
-func NewAIModel(modelType ModelType) (AIModel, error){
+func newAIModel(modelType ModelType) (AIModel, error){
 	switch modelType{
 	case DEEP_SEEK:
-		client, err := deepseek.NewClient(Deepseek_api_key)
+		client, err := deepseek.NewClient(deepseek_api_key)
 		if err != nil{
 			return nil, err
 		}
-		return &DeepseekModel{client, Deepseek_api_key}, nil
+		return &DeepseekModel{client, deepseek_api_key}, nil
 	case GEMINI:
 		ctx := context.Background()
 		// The client gets the API key from the environment variable `GEMINI_API_KEY`.
@@ -96,7 +125,11 @@ func NewAIModel(modelType ModelType) (AIModel, error){
 		if err != nil {
 			log.Fatal(err)
 		}
-		return &GeminiModel{Gemini_api_key, ctx, client}, nil
+		return &GeminiModel{gemini_api_key, ctx, client}, nil
+	case ARK:
+		ctx := context.Background()
+		client := arkruntime.NewClientWithApiKey(ark_api_key)
+		return &VolcanoModel{client, ctx}, nil
 	}
 	return nil, errors.New("Model not found")
 }
@@ -113,7 +146,11 @@ type GeminiModel struct{
 	ctx context.Context
 	client *genai.Client
 }
+type VolcanoModel struct{
+	client *arkruntime.Client
+	ctx context.Context
 
+}
 func (ds *DeepseekModel) GetDefinition(word string) (string, error){
 	chatReq := &request.ChatCompletionsRequest{
 		Model:  deepseek.DEEPSEEK_CHAT_MODEL,
@@ -146,6 +183,26 @@ func (gemini *GeminiModel)GetDefinition(word string) (string, error){
     return result.Text(), nil
 }
 
+func (model *VolcanoModel)GetDefinition(word string) (string, error){
+	req1 := volModel.CreateChatCompletionRequest{
+       Model: "doubao-seed-1-6-lite-251015",  //替换为Model ID，请从文档获取 https://www.volcengine.com/docs/82379/1330310
+       Messages: []*volModel.ChatCompletionMessage{
+          {
+             Role: volModel.ChatMessageRoleUser,
+             Content: &volModel.ChatCompletionMessageContent{
+                StringValue: volcengine.String(prompts[WORD_QUERY] + "set"),
+             },
+          },
+       },
+    }
+
+    resp1, err := model.client.CreateChatCompletion(model.ctx, req1)
+    if err != nil {
+		log.Fatal(err)
+       	return "", err
+    }
+	return *resp1.Choices[0].Message.Content.StringValue, nil
+}
 
 // client := openai.NewClient(
 // 	option.WithAPIKey(Gemini_api_key), // defaults to os.LookupEnv("OPENAI_API_KEY")
@@ -160,3 +217,35 @@ func (gemini *GeminiModel)GetDefinition(word string) (string, error){
 // 	panic(err.Error())
 // }
 // println(chatCompletion.Choices[0].Message.Content)
+
+
+// var doubao_seed_1_8_251215 = "doubao-seed-1-8-251215"
+// var doubao_seed_code_preview_251028 = "doubao-seed-code-preview-251028"
+// var doubao_seed_1_6_lite_251015 = "doubao-seed-1-6-lite-251015"
+// var doubao_seed_1_6_flash_250828 = "doubao-seed-1-6-flash-250828"
+// var doubao_seed_1_6_vision_250815 = "doubao-seed-1-6-vision-250815"
+
+// func Volai(){
+// 	client := arkruntime.NewClientWithApiKey(Ark_api_key)
+//     ctx := context.Background()
+//     // 第一次请求
+//     req1 := volModel.CreateChatCompletionRequest{
+//        Model: "doubao-seed-1-6-lite-251015",  //替换为Model ID，请从文档获取 https://www.volcengine.com/docs/82379/1330310
+//        Messages: []*volModel.ChatCompletionMessage{
+//           {
+//              Role: volModel.ChatMessageRoleUser,
+//              Content: &volModel.ChatCompletionMessageContent{
+//                 StringValue: volcengine.String(prompts[WORD_QUERY] + "set"),
+//              },
+//           },
+//        },
+//     }
+
+//     resp1, err := client.CreateChatCompletion(ctx, req1)
+//     if err != nil {
+// 		log.Fatal(err)
+//        	return
+//     }
+//     fmt.Println(*resp1.Choices[0].Message.Content.StringValue)
+// }
+
