@@ -51,6 +51,7 @@ var deepseek_api_key string
 var ark_api_key string
 var json_format = `{
   "word": "expose",
+  "pronunciation":"/ɪkˈspəʊz/"
   "definitions": [
     {
       "pos": "vt.",
@@ -80,16 +81,11 @@ var json_format = `{
   "phrases": [
 	{
 		"example": "expose to",
-		"example_cn": [
-			"使...暴露于"，
-			"使...受...影响"
-		]
+		"example_cn": "使...暴露于"
 	},
 	{
 		"example": "expose a secret",
-		"example_cn": [
-			"揭露秘密"，
-		]
+		"example_cn": "揭露秘密"
 	}
   ],
   "synonyms": [
@@ -101,7 +97,7 @@ var json_format = `{
 }`
 var prompts = map[int]string{
 	WORD_QUERY: "请以这样的json格式回复我(不要带任何多余符号,标点符号都用英文回复):" + json_format +
-	"列举出该单词的所有词性以及对应的中文释义、10个左右数量的该单词的派生词(派生词" + 
+	"列举出该单词的所有词性以及对应的中文释义、发音、10个左右数量的该单词的派生词(派生词" + 
 	"定义为和该单词有几分相似的单词)、该单词是否是四级、六级、雅思、考研、专升本的核心词汇、" +
 	"一条包含该单词的典型例句、" + 
 	"包含该单词的几个典型短语(如果有)、该单词的近义词。本次查询:",

@@ -1,5 +1,9 @@
 package main
-import "fmt"
+import (
+	"fmt"
+	"github.com/byBit-ovo/coral_word/llm"
+	"encoding/json"
+)
 
 type Definition struct{
 	Pos string 			`json:"pos"`
@@ -7,11 +11,31 @@ type Definition struct{
 }
 type Phrase struct{
 	Example string 			`json:"example"`
-	Example_cn []string 	`json:"example_cn"`
+	Example_cn string 	`json:"example_cn"`
 }
-
+const(
+	TagZsb = 1 << iota
+	TagCET4
+	TagCET6
+	TagIELTS
+	TagPostgrad
+)
+func aggregateTags(tags []string) int32{
+	count := 0
+	for _, tag := range tags{
+		switch tag {
+		case "专升本": count += TagZsb
+		case "四级": count += TagCET4
+		case "六级": count += TagCET6
+		case "雅思": count += TagIELTS
+		case "考研": count += TagPostgrad
+		}
+	}
+	return int32(count)
+}
 type wordDesc struct{
-	Self string `json:"word"`
+	Word string `json:"word"`
+	Pronunciation string `json:"pronunciation"`
 	Definitions []Definition `json:"definitions"`
 	Derivatives []string `json:"derivatives"`
 	Exam_tags   []string `json:"exam_tags"`
@@ -21,8 +45,28 @@ type wordDesc struct{
 	Synonyms    []string `json:"synonyms"`
 }
 
+func QueryWord(word string) (*wordDesc, error){
+	word_desc, err := selectWord(word)
+	if err != nil{
+		json_rsp, err := llm.Models[llm.DEEP_SEEK].GetDefinition(word)
+		if err != nil{
+			return nil, err
+		}
+		word_desc = &wordDesc{}
+		err = json.Unmarshal([]byte(json_rsp), word_desc)
+		if err != nil{
+			return nil, err
+		}
+		err = insertWord(word_desc)
+		if err != nil{
+			return nil, err
+		}
+	}
+	return word_desc, nil
+}
+
 func showWord(word *wordDesc){
-	fmt.Println(word.Self)
+	fmt.Println(word.Word, word.Pronunciation)
 	for _, def := range word.Definitions{
 		fmt.Println(def.Pos)
 		for _, meaning := range def.Meanings{
@@ -41,12 +85,7 @@ func showWord(word *wordDesc){
 	fmt.Println(word.Example)
 	fmt.Println(word.Example_cn)
 	for _, phrase := range word.Phrases{
-		fmt.Println(phrase.Example)
-		for _, cn := range phrase.Example_cn{
-			fmt.Print(cn + " ")
-		}
-		fmt.Println()
-
+		fmt.Println(phrase.Example + " " + phrase.Example_cn)
 	}
 	fmt.Println(word.Synonyms)
 }
