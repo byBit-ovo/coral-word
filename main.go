@@ -27,7 +27,7 @@ func main() {
 	if InitSQL() != nil{
 		log.Fatal("Init SQL error")
 	}
-	word, err := QueryWord("formal")
+	word, err := QueryWord("academy")
 	if err != nil{
 		fmt.Println(err)
 	}

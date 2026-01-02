@@ -33,6 +33,25 @@ func aggregateTags(tags []string) int32{
 	}
 	return int32(count)
 }
+func TagsFromMask(mask int32) []string{
+	tags := []string{}
+	if mask&TagZsb != 0 {
+        tags = append(tags, "专升本")
+    }
+    if mask&TagCET4 != 0 {
+        tags = append(tags, "四级")
+    }
+    if mask&TagCET6 != 0 {
+        tags = append(tags, "六级")
+    }
+    if mask&TagIELTS != 0 {
+        tags = append(tags, "雅思")
+    }
+    if mask&TagPostgrad != 0 {
+        tags = append(tags, "考研")
+    }
+	return tags
+}
 type wordDesc struct{
 	Word string `json:"word"`
 	Pronunciation string `json:"pronunciation"`
@@ -62,6 +81,7 @@ func QueryWord(word string) (*wordDesc, error){
 			return nil, err
 		}
 	}
+
 	return word_desc, nil
 }
 
