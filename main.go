@@ -4,7 +4,7 @@ import (
 	_ "context"
 	_ "database/sql"
 	_ "encoding/json"
-	"fmt"
+	_"fmt"
 	_ "fmt"
 	"log"
 	_ "time"
@@ -27,11 +27,23 @@ func main() {
 	if InitSQL() != nil{
 		log.Fatal("Init SQL error")
 	}
-	word, err := QueryWord("academy")
+	word, err := QueryWord("puppet")
 	if err != nil{
-		fmt.Println(err)
+		log.Fatal(err)
 	}
 	showWord(word)
+	// a := 0
+	// defer func(){
+	// 	fmt.Println(a)
+	// }()
+	// a += 1
+	// defer func(){
+	// 	fmt.Println(a)
+	// }()
+	// a += 1
+	// defer func(){
+	// 	fmt.Println(a)
+	// }()
 	// res, err := llm.Models[llm.DEEP_SEEK].GetDefinition("state")
 	// word_1 := wordDesc{}
 	// err = json.Unmarshal([]byte(res), &word_1)
