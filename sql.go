@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"sort"
-
+	_"strconv"
 	// "time"
-
+	"github.com/google/uuid"
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -150,7 +150,11 @@ func selectWord(word string) (*wordDesc, error) {
     if err != nil {
         return nil, err
     }
-    defer func() { _ = tx.Rollback() }()
+    defer func() { 
+		if err != nil{
+			_ = tx.Rollback() 
+		}
+	}()
 
     // 查询主表
     row := tx.QueryRow("SELECT id, word, pronunciation, tag FROM vocabulary WHERE word = ?", word)
@@ -280,7 +284,11 @@ func insertWord(word *wordDesc)error{
 	if err != nil {
     	return err
 	}
-	defer func(){ _ = tx.Rollback()}()
+	defer func() { 
+		if err != nil{
+			_ = tx.Rollback() 
+		}
+	}()
 	res, err := tx.Exec(`insert into vocabulary (word, pronunciation, tag) values (?,?,?)`, word.Word, word.Pronunciation, tags)
 	if err != nil {
     	return err
@@ -345,4 +353,50 @@ func insertWord(word *wordDesc)error{
 		}
 	}
 	return tx.Commit()
+}
+
+type User struct{
+	Id string `json:"id"`
+	Name string `json:"name"`
+	Pswd string `json:"pswd"`
+}
+
+func selectUser(name string) (*User, error){
+	row, err := db.Query("select id, name, pswd from user where name=?",name)
+	if err !=nil{
+		return nil, err
+	}
+	user := &User{}
+	if err := row.Scan(&(user.Id), &(user.Name), &(user.Pswd)); err != nil{
+		return nil, err
+	}
+	return user, nil
+}
+
+func insertUser(name, pswd string) (string, error){
+	tryUser, err := selectUser(name)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err // 查询出错
+	}
+	if tryUser != nil {
+		return "", fmt.Errorf("user already exists")
+	}
+	tx, err := db.Begin()
+	if err != nil{
+		return "", err
+	}
+	defer func(){
+		if err != nil{
+			_ = tx.Rollback()
+		}
+	}()
+	id := uuid.New().String()
+	_, err = tx.Exec("insert into user (id, name, pswd) values (?,?,?)",id ,name, pswd)
+	if err != nil{
+		return "", err
+	}
+	if err = tx.Commit(); err != nil{
+		return "", fmt.Errorf("failed to commit transaction: %w", err)
+	}
+	return id, nil
 }

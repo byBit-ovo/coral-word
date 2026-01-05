@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"log"
 	_ "time"
-
 	"github.com/byBit-ovo/coral_word/llm"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 	"encoding/json"
 	"bytes"
+	_"strconv"
+	"github.com/google/uuid"
 	
 )
 func init(){
@@ -27,18 +28,27 @@ func init(){
 	if err = InitSQL(); err != nil{
 		log.Fatal("Init SQL error")
 	}
-	if err = InitEs(); err != nil{
-		log.Fatal("Init es error: ", err)
-	}
+	// if err = InitEs(); err != nil{
+	// 	log.Fatal("Init es error: ", err)
+	// }
 	// json_rsp, err := llm.Models[llm.GEMINI].GetDefinition("empathy")
 	// fmt.Println(json_rsp)
-	word, err := QueryWord("suspect")
-	if err != nil{
-		log.Fatal(err)
-	}
-	showWord(word)
+	// word, err := QueryWord("suspect")
+	// if err != nil{
+	// 	log.Fatal(err)
+	// }
+	// showWord(word)
 	
 }
+
+func main() {
+	id := uuid.New().String()
+	fmt.Println(id)
+	// word := "set"
+	// updateQuery := fmt.Sprintf("update vocabulary set hit_count=hit_count+1 where word = '%s' ", word)
+	// fmt.Println(updateQuery)
+}
+
 func esSearch(){
 	query := map[string]interface{}{
         "query": map[string]interface{}{
@@ -67,9 +77,3 @@ func esSearch(){
     // 打印结果
     fmt.Println(result)
 }
-func main() {
-	// word := "set"
-	// updateQuery := fmt.Sprintf("update vocabulary set hit_count=hit_count+1 where word = '%s' ", word)
-	// fmt.Println(updateQuery)
-}
-
