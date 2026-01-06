@@ -362,10 +362,7 @@ type User struct{
 }
 
 func selectUser(name string) (*User, error){
-	row, err := db.Query("select id, name, pswd from user where name=?",name)
-	if err !=nil{
-		return nil, err
-	}
+	row := db.QueryRow("select id, name, pswd from user where name=?",name)
 	user := &User{}
 	if err := row.Scan(&(user.Id), &(user.Name), &(user.Pswd)); err != nil{
 		return nil, err
@@ -400,3 +397,12 @@ func insertUser(name, pswd string) (string, error){
 	}
 	return id, nil
 }
+var userSession = map[string]string{}
+
+func createNoteBook(session string, bookName string)error{
+	if _,ok := userSession[session];ok == false{
+		return fmt.Errorf("user isn't logged in !")
+	}
+	
+}
+func AddWordToNotebook(word)

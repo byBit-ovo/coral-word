@@ -13,7 +13,7 @@ import (
 	"encoding/json"
 	"bytes"
 	_"strconv"
-	"github.com/google/uuid"
+	_"github.com/google/uuid"
 	
 )
 func init(){
@@ -42,8 +42,14 @@ func init(){
 }
 
 func main() {
-	id := uuid.New().String()
-	fmt.Println(id)
+	user, err := insertUser("byBit","200533")
+	if err != nil{
+		log.Fatal("insert user erro:", err)
+	}
+	fmt.Println(user)
+	// id := uuid.New().String()
+	// fmt.Println(id)
+	// testGin()
 	// word := "set"
 	// updateQuery := fmt.Sprintf("update vocabulary set hit_count=hit_count+1 where word = '%s' ", word)
 	// fmt.Println(updateQuery)
