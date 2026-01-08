@@ -2,13 +2,15 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
+	_"errors"
+	_"fmt"
 	"os"
 	"sort"
-	_"strconv"
+	_ "strconv"
+
 	// "time"
-	"github.com/google/uuid"
 	_ "github.com/go-sql-driver/mysql"
+	_"github.com/google/uuid"
 )
 
 
@@ -141,11 +143,37 @@ func minDistance(word1 string, word2 string) int {
 
 // 	return &word_desc, tx.Commit()
 // }
-func selectWord(word string) (*wordDesc, error) {
-    var wordID int32
-    wordDesc := wordDesc{}
+func selectWordById(wordID int64)(w *wordDesc, err error){
+    w = &wordDesc{}
     var tag int32
+    tx, err := db.Begin()
+    if err != nil {
+        return nil, err
+    }
+    defer func() { 
+		if err != nil{
+			_ = tx.Rollback() 
+		}
+	}()
 
+    // 查询主表
+    row := tx.QueryRow("SELECT word, pronunciation, tag FROM vocabulary WHERE word_id = ?", wordID)
+    if err := row.Scan(&w.Word, &w.Pronunciation, &tag); err != nil {
+        return nil, err
+    }
+	if err := aggWord(w,tx,wordID,tag);err != nil{
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+        return nil,err
+    }
+	return w, nil
+}
+
+func selectWordByName(word string) (w *wordDesc, err error) {
+    var wordID int64
+    w = &wordDesc{}
+    var tag int32
     tx, err := db.Begin()
     if err != nil {
         return nil, err
@@ -158,58 +186,64 @@ func selectWord(word string) (*wordDesc, error) {
 
     // 查询主表
     row := tx.QueryRow("SELECT id, word, pronunciation, tag FROM vocabulary WHERE word = ?", word)
-    if err := row.Scan(&wordID, &wordDesc.Word, &wordDesc.Pronunciation, &tag); err != nil {
+    if err := row.Scan(&wordID, &w.Word, &w.Pronunciation, &tag); err != nil {
         return nil, err
     }
-	updateQuery := fmt.Sprintf("update vocabulary set hit_count=hit_count+1 where word = '%s' ", word)
-	_, err = tx.Exec(updateQuery)
-	if err != nil{
+	if err := aggWord(w,tx,wordID,tag);err != nil{
 		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+        return nil,err
+    }
+	return w, nil
+
+}
+func aggWord(wordDesc *wordDesc, tx *sql.Tx, wordID int64, tag int32 )error{
+	// updateQuery := fmt.Sprintf("update vocabulary set hit_count=hit_count+1 where word_id = '%d' ", wordID)
+	// _, err := tx.Exec(updateQuery)
+	_, err := tx.Exec("UPDATE vocabulary SET hit_count = hit_count + 1 WHERE id = ?", wordID)
+	if err != nil{
+		return err
 	}
     wordDesc.Exam_tags = TagsFromMask(tag)
 
     // 查询 definitions
     definitions, err := queryDefinitions(tx, wordID)
     if err != nil {
-        return nil, err
+        return err
     }
     wordDesc.Definitions = definitions
 
     // 查询 synonyms
     synonyms, err := queryStrings(tx, "SELECT syn FROM synonyms WHERE word_id = ?", wordID)
     if err != nil {
-        return nil, err
+        return err
     }
     wordDesc.Synonyms = synonyms
 
     // 查询 derivatives
     derivatives, err := queryStrings(tx, "SELECT der FROM derivatives WHERE word_id = ?", wordID)
     if err != nil {
-        return nil, err
+        return err
     }
     wordDesc.Derivatives = derivatives
 
     // 查询 example
-    row = tx.QueryRow("SELECT sentence, translation FROM example WHERE word_id = ?", wordID)
+    row := tx.QueryRow("SELECT sentence, translation FROM example WHERE word_id = ?", wordID)
     if err := row.Scan(&wordDesc.Example, &wordDesc.Example_cn); err != nil && err != sql.ErrNoRows {
-        return nil, err
+        return err
     }
 
     // 查询 phrases
     phrases, err := queryPhrases(tx, wordID)
     if err != nil {
-        return nil, err
+        return err
     }
     wordDesc.Phrases = phrases
-
-    if err := tx.Commit(); err != nil {
-        return nil, err
-    }
-    return &wordDesc, nil
+    return nil
 }
-
 // 查询 definitions
-func queryDefinitions(tx *sql.Tx, wordID int32) ([]Definition, error) {
+func queryDefinitions(tx *sql.Tx, wordID int64) ([]Definition, error) {
     rows, err := tx.Query("SELECT pos, translation FROM vocabulary_cn WHERE word_id = ?", wordID)
     if err != nil {
         return nil, err
@@ -258,7 +292,7 @@ func queryStrings(tx *sql.Tx, query string, args ...interface{}) ([]string, erro
 }
 
 // 查询 phrases
-func queryPhrases(tx *sql.Tx, wordID int32) ([]Phrase, error) {
+func queryPhrases(tx *sql.Tx, wordID int64) ([]Phrase, error) {
     rows, err := tx.Query("SELECT phrase, translation FROM phrases WHERE word_id = ?", wordID)
     if err != nil {
         return nil, err
@@ -278,7 +312,7 @@ func queryPhrases(tx *sql.Tx, wordID int32) ([]Phrase, error) {
     }
     return phrases, nil
 }
-func insertWord(word *wordDesc)error{
+func insertWord(word *wordDesc)(err error){
 	tags := aggregateTags(word.Exam_tags)
 	tx, err := db.Begin()
 	if err != nil {
@@ -355,54 +389,3 @@ func insertWord(word *wordDesc)error{
 	return tx.Commit()
 }
 
-type User struct{
-	Id string `json:"id"`
-	Name string `json:"name"`
-	Pswd string `json:"pswd"`
-}
-
-func selectUser(name string) (*User, error){
-	row := db.QueryRow("select id, name, pswd from user where name=?",name)
-	user := &User{}
-	if err := row.Scan(&(user.Id), &(user.Name), &(user.Pswd)); err != nil{
-		return nil, err
-	}
-	return user, nil
-}
-
-func insertUser(name, pswd string) (string, error){
-	tryUser, err := selectUser(name)
-	if err != nil && err != sql.ErrNoRows {
-		return "", err // 查询出错
-	}
-	if tryUser != nil {
-		return "", fmt.Errorf("user already exists")
-	}
-	tx, err := db.Begin()
-	if err != nil{
-		return "", err
-	}
-	defer func(){
-		if err != nil{
-			_ = tx.Rollback()
-		}
-	}()
-	id := uuid.New().String()
-	_, err = tx.Exec("insert into user (id, name, pswd) values (?,?,?)",id ,name, pswd)
-	if err != nil{
-		return "", err
-	}
-	if err = tx.Commit(); err != nil{
-		return "", fmt.Errorf("failed to commit transaction: %w", err)
-	}
-	return id, nil
-}
-var userSession = map[string]string{}
-
-func createNoteBook(session string, bookName string)error{
-	if _,ok := userSession[session];ok == false{
-		return fmt.Errorf("user isn't logged in !")
-	}
-	
-}
-func AddWordToNotebook(word)

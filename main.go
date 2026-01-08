@@ -42,11 +42,12 @@ func init(){
 }
 
 func main() {
-	user, err := insertUser("byBit","200533")
+	sid, err := userLogin("byBit","1234567")
+	// user, err := insertUser("byBit","200533")
 	if err != nil{
 		log.Fatal("insert user erro:", err)
 	}
-	fmt.Println(user)
+	fmt.Println("sessionId: ", sid)
 	// id := uuid.New().String()
 	// fmt.Println(id)
 	// testGin()

@@ -69,8 +69,9 @@ type wordDesc struct{
 	Synonyms    []string `json:"synonyms"`
 }
 
+
 func QueryWord(word string) (*wordDesc, error){
-	word_desc, err := selectWord(word)
+	word_desc, err := selectWordByName(word)
 	if err != nil{
 		json_rsp, err := llm.Models[llm.DEEP_SEEK].GetDefinition(word)
 		if err != nil{
