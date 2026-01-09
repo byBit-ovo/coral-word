@@ -98,7 +98,7 @@ func listNoteWords(uid string)error{
 		for _,word_id := range words{
 			word_desc, err:= selectWordById(word_id)
 			if err != nil{
-				fmt.Println("select word_id %d error: %s", word_id,err.Error())
+				fmt.Println("select word error:", word_id,err.Error())
 				continue
 			}
 			wordsPool[word_id] = word_desc
@@ -116,6 +116,7 @@ func userLogin(name, pswd string)(string,error){
 	}
 	sessionId := uuid.New().String()
 	userSession[sessionId] = user.Id
+	listNoteWords(user.Id)
 	return sessionId, nil
 }
 
@@ -172,7 +173,7 @@ func createNoteBook(session string, bookName string) (err error){
 			_ = tx.Rollback()
 		}
 	}()
-	_, err = tx.Exec("insert into note_book (book_name, user_id) values (?,?,?)", bookName,uid)
+	_, err = tx.Exec("insert into note_book (book_name, user_id) values (?,?)", bookName,uid)
 	if err != nil{
 		return fmt.Errorf("failed to insert notebook: %w", err)
 	}
@@ -193,7 +194,7 @@ func AddWordToNotebook(session, word, noteBookName string) (err error){
 			_ = tx.Rollback()
 		}
 	}()
-	row := tx.QueryRow("select id from vocabulay where word = ?", word)
+	row := tx.QueryRow("select id from vocabulary where word = ?", word)
 	var wordId int64
 	if err:=row.Scan(&wordId); err != nil{
 		return err

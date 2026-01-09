@@ -158,13 +158,13 @@ func selectWordById(wordID int64)(w *wordDesc, err error){
 
     // 查询主表
     row := tx.QueryRow("SELECT word, pronunciation, tag FROM vocabulary WHERE word_id = ?", wordID)
-    if err := row.Scan(&w.Word, &w.Pronunciation, &tag); err != nil {
+    if err = row.Scan(&w.Word, &w.Pronunciation, &tag); err != nil {
         return nil, err
     }
-	if err := aggWord(w,tx,wordID,tag);err != nil{
+	if err = aggWord(w,tx,wordID,tag);err != nil{
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
         return nil,err
     }
 	return w, nil
@@ -186,13 +186,13 @@ func selectWordByName(word string) (w *wordDesc, err error) {
 
     // 查询主表
     row := tx.QueryRow("SELECT id, word, pronunciation, tag FROM vocabulary WHERE word = ?", word)
-    if err := row.Scan(&wordID, &w.Word, &w.Pronunciation, &tag); err != nil {
+    if err = row.Scan(&wordID, &w.Word, &w.Pronunciation, &tag); err != nil {
         return nil, err
     }
-	if err := aggWord(w,tx,wordID,tag);err != nil{
+	if err = aggWord(w,tx,wordID,tag);err != nil{
 		return nil, err
 	}
-	if err := tx.Commit(); err != nil {
+	if err = tx.Commit(); err != nil {
         return nil,err
     }
 	return w, nil
