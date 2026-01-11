@@ -67,17 +67,20 @@ type wordDesc struct{
 	Example_cn 	string   `json:"example_cn"`
 	Phrases  	[]Phrase `json:"phrases"`
 	Synonyms    []string `json:"synonyms"`
+	Source 		int
 }
 
 
 func QueryWord(word string) (*wordDesc, error){
 	word_desc, err := selectWordByName(word)
+	choseModel := llm.GEMINI
 	if err != nil{
-		json_rsp, err := llm.Models[llm.DEEP_SEEK].GetDefinition(word)
+		json_rsp, err := llm.Models[choseModel].GetDefinition(word)
 		if err != nil{
 			return nil, err
 		}
 		word_desc = &wordDesc{}
+		word_desc.Source = choseModel
 		err = json.Unmarshal([]byte(json_rsp), word_desc)
 		if err != nil || word_desc.Err == "true"{
 			return nil, err
@@ -92,6 +95,7 @@ func QueryWord(word string) (*wordDesc, error){
 }
 
 func showWord(word *wordDesc){
+	fmt.Println("Source: ",llm.ModelsName[word.Source])
 	fmt.Println(word.Word, word.Pronunciation)
 	for _, def := range word.Definitions{
 		fmt.Println(def.Pos)

@@ -62,87 +62,7 @@ func minDistance(word1 string, word2 string) int {
     }
     return dfs(0,0)
 }
-// func selectWord(word string)(*wordDesc, error){
-// 	var word_id int32
-// 	word_desc := wordDesc{}
-// 	var tag int32
-// 	tx, err := db.Begin()
-// 	if err != nil{
-// 		return nil, err
-// 	}
-// 	defer func() {_ = tx.Rollback() }()
-// 	row := tx.QueryRow("select id, word, pronunciation, tag from vocabulary where word=?",word)
-// 	err = row.Scan(&word_id, &word_desc.Word,&word_desc.Pronunciation,&tag)
-// 	if err != nil{
-// 		return nil, err
-// 	}
-// 	word_desc.Exam_tags = TagsFromMask(tag)
-// 	rows, err := tx.Query("select pos, translation from vocabulary_cn where word_id=?",word_id)
-// 	if err != nil{
-// 		return nil, err
-// 	}
-// 	defer rows.Close()
-// 	var definitions = make(map[string][]string)
-// 	for rows.Next(){
-// 		var pos string
-// 		var trans string
-// 		if err := rows.Scan(&pos, &trans); err != nil {
-//         	return nil, err
-//     	}
-// 		definitions[pos] = append(definitions[pos], trans)
-// 	}
-// 	if err := rows.Err(); err != nil {
-//         return nil, err
-//     }
-// 	for k,v := range definitions{
-// 		word_desc.Definitions = append(word_desc.Definitions, Definition{k,v})
-// 	}
-// 	rows, err = tx.Query("select syn from synonyms where word_id = ?", word_id)
-// 	if err != nil{
-// 		return nil, err
-// 	}
-// 	for rows.Next(){
-// 		var syn string
-// 		if err = rows.Scan(&syn);err != nil{
-// 			return nil, err
-// 		}
-// 		word_desc.Synonyms = append(word_desc.Synonyms, syn)
-// 	}
-// 	rows, err = tx.Query("select der from derivatives where word_id = ?", word_id)
-// 	if err != nil{
-// 		return nil, err
-// 	}
-// 	for rows.Next(){
-// 		var der string
-// 		if err = rows.Scan(&der); err != nil{
-// 			return nil, err
-// 		}
-// 		word_desc.Derivatives = append(word_desc.Derivatives, der)
-// 	}
-// 	if err := rows.Err(); err != nil {
-//         return nil, err
-//     }
-// 	row = tx.QueryRow("select sentence, translation from example where word_id=?",word_id)
-// 	if err = row.Scan(&word_desc.Example, &word_desc.Example_cn); err != nil{
-// 		return nil, err
-// 	}
-// 	rows, err = tx.Query("select phrase, translation from phrases where word_id=? ",word_id)
-// 	if err != nil{
-// 		return nil, err
-// 	}
-// 	for rows.Next(){
-// 		var phrase, translation string
-// 		if rows.Scan(&phrase, &translation) != nil{
-// 			return nil, err
-// 		}
-// 		word_desc.Phrases = append(word_desc.Phrases, Phrase{phrase, translation})
-// 	}
-// 	if err := rows.Err(); err != nil {
-//         return nil, err
-//     }
 
-// 	return &word_desc, tx.Commit()
-// }
 func selectWordById(wordID int64)(w *wordDesc, err error){
     w = &wordDesc{}
     var tag int64
@@ -157,8 +77,9 @@ func selectWordById(wordID int64)(w *wordDesc, err error){
 	}()
 
     // 查询主表
-    row := tx.QueryRow("SELECT word, pronunciation, tag FROM vocabulary WHERE id = ?", wordID)
-    if err = row.Scan(&w.Word, &w.Pronunciation, &tag); err != nil {
+	source := 0
+    row := tx.QueryRow("SELECT word, pronunciation, tag, source FROM vocabulary WHERE id = ?", wordID)
+    if err = row.Scan(&w.Word, &w.Pronunciation, &tag,&source); err != nil {
         return nil, err
     }
 	if err = aggWord(w,tx,wordID,tag);err != nil{
@@ -183,10 +104,10 @@ func selectWordByName(word string) (w *wordDesc, err error) {
 			_ = tx.Rollback() 
 		}
 	}()
-
+	source := 0
     // 查询主表
-    row := tx.QueryRow("SELECT id, word, pronunciation, tag FROM vocabulary WHERE word = ?", word)
-    if err = row.Scan(&wordID, &w.Word, &w.Pronunciation, &tag); err != nil {
+    row := tx.QueryRow("SELECT id, word, pronunciation, tag, source FROM vocabulary WHERE word = ?", word)
+    if err = row.Scan(&wordID, &w.Word, &w.Pronunciation, &tag, &source); err != nil {
         return nil, err
     }
 	if err = aggWord(w,tx,wordID,tag);err != nil{
@@ -323,7 +244,7 @@ func insertWord(word *wordDesc)(err error){
 			_ = tx.Rollback() 
 		}
 	}()
-	res, err := tx.Exec(`insert into vocabulary (word, pronunciation, tag) values (?,?,?)`, word.Word, word.Pronunciation, tags)
+	res, err := tx.Exec(`insert into vocabulary (word, pronunciation, tag, source) values (?,?,?,?)`, word.Word, word.Pronunciation, tags,word.Source)
 	if err != nil {
     	return err
 	}
@@ -389,3 +310,89 @@ func insertWord(word *wordDesc)(err error){
 	return tx.Commit()
 }
 
+
+
+
+
+
+// func selectWord(word string)(*wordDesc, error){
+// 	var word_id int32
+// 	word_desc := wordDesc{}
+// 	var tag int32
+// 	tx, err := db.Begin()
+// 	if err != nil{
+// 		return nil, err
+// 	}
+// 	defer func() {_ = tx.Rollback() }()
+// 	row := tx.QueryRow("select id, word, pronunciation, tag from vocabulary where word=?",word)
+// 	err = row.Scan(&word_id, &word_desc.Word,&word_desc.Pronunciation,&tag)
+// 	if err != nil{
+// 		return nil, err
+// 	}
+// 	word_desc.Exam_tags = TagsFromMask(tag)
+// 	rows, err := tx.Query("select pos, translation from vocabulary_cn where word_id=?",word_id)
+// 	if err != nil{
+// 		return nil, err
+// 	}
+// 	defer rows.Close()
+// 	var definitions = make(map[string][]string)
+// 	for rows.Next(){
+// 		var pos string
+// 		var trans string
+// 		if err := rows.Scan(&pos, &trans); err != nil {
+//         	return nil, err
+//     	}
+// 		definitions[pos] = append(definitions[pos], trans)
+// 	}
+// 	if err := rows.Err(); err != nil {
+//         return nil, err
+//     }
+// 	for k,v := range definitions{
+// 		word_desc.Definitions = append(word_desc.Definitions, Definition{k,v})
+// 	}
+// 	rows, err = tx.Query("select syn from synonyms where word_id = ?", word_id)
+// 	if err != nil{
+// 		return nil, err
+// 	}
+// 	for rows.Next(){
+// 		var syn string
+// 		if err = rows.Scan(&syn);err != nil{
+// 			return nil, err
+// 		}
+// 		word_desc.Synonyms = append(word_desc.Synonyms, syn)
+// 	}
+// 	rows, err = tx.Query("select der from derivatives where word_id = ?", word_id)
+// 	if err != nil{
+// 		return nil, err
+// 	}
+// 	for rows.Next(){
+// 		var der string
+// 		if err = rows.Scan(&der); err != nil{
+// 			return nil, err
+// 		}
+// 		word_desc.Derivatives = append(word_desc.Derivatives, der)
+// 	}
+// 	if err := rows.Err(); err != nil {
+//         return nil, err
+//     }
+// 	row = tx.QueryRow("select sentence, translation from example where word_id=?",word_id)
+// 	if err = row.Scan(&word_desc.Example, &word_desc.Example_cn); err != nil{
+// 		return nil, err
+// 	}
+// 	rows, err = tx.Query("select phrase, translation from phrases where word_id=? ",word_id)
+// 	if err != nil{
+// 		return nil, err
+// 	}
+// 	for rows.Next(){
+// 		var phrase, translation string
+// 		if rows.Scan(&phrase, &translation) != nil{
+// 			return nil, err
+// 		}
+// 		word_desc.Phrases = append(word_desc.Phrases, Phrase{phrase, translation})
+// 	}
+// 	if err := rows.Err(); err != nil {
+//         return nil, err
+//     }
+
+// 	return &word_desc, tx.Commit()
+// }

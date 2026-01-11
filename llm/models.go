@@ -42,6 +42,11 @@ const (
 	GEMINI
 	ARK
 )
+var ModelsName = []string{
+	"deepseek",
+	"gemini",
+	"ark",
+}
 const (
 	WORD_QUERY = iota
 )

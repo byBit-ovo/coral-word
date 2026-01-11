@@ -212,19 +212,19 @@ func AddWordToNotebook(session, word, noteBookName string) (err error){
 	return tx.Commit()
 }
 
-func dailyCheckIn(uid string) error {
-	var books map[string][]int64
-	var ok bool
-	if books, ok = userNoteWords[uid]; ok==false{
-		fmt.Println("尚未创建笔记本!")
-		return errors.New("用户尚未创建任何笔记本!")
-	}
-	fmt.Println("请选择要复习的笔记本:")
-	for k,_ := range books{
-		fmt.Print(k, " ")
-	}
-	var choice string
-	fmt.Scan(&choice)
-	if 
+// func dailyCheckIn(uid string) error {
+// 	var books map[string][]int64
+// 	var ok bool
+// 	if books, ok = userNoteWords[uid]; ok==false{
+// 		fmt.Println("尚未创建笔记本!")
+// 		return errors.New("用户尚未创建任何笔记本!")
+// 	}
+// 	fmt.Println("请选择要复习的笔记本:")
+// 	for k,_ := range books{
+// 		fmt.Print(k, " ")
+// 	}
+// 	var choice string
+// 	fmt.Scan(&choice)
 	
-}
+	
+// }

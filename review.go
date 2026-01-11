@@ -5,7 +5,7 @@ import (
     "sort"
     "time"
 	"fmt"
-	"rand"
+	// "rand"
 )
 
 // WordLearning 单词学习记录
@@ -88,6 +88,7 @@ func CalculatePriority(wl *WordLearning) float64 {
     priority := 0.0
     
     // 1. 逾期时间因素（越逾期越优先）
+	// 检查是否已超过截止时间
     if now.After(wl.NextReviewTime) {
         overdueDays := now.Sub(wl.NextReviewTime).Hours() / 24
         priority += overdueDays * 10
@@ -116,7 +117,7 @@ func CalculatePriority(wl *WordLearning) float64 {
 // SelectTodayWords 选择今日需要复习的单词
 func SelectTodayWords(userID string, bookID int64, count int) ([]*WordLearning, error) {
     now := time.Now()
-    today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+    // today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
     
     // 从数据库查询需要复习的单词
     query := `
@@ -244,11 +245,11 @@ func shuffleWithinRounds(queue []*ReviewItem) {
     }
     
     // 打乱每一轮的顺序
-    for _, items := range rounds {
-        rand.Shuffle(len(items), func(i, j int) {
-            items[i], items[j] = items[j], items[i]
-        })
-    }
+    // for _, items := range rounds {
+    //     rand.Shuffle(len(items), func(i, j int) {
+    //         items[i], items[j] = items[j], items[i]
+    //     })
+    // }
 }
 
 // ProcessAnswer 处理用户答题结果
