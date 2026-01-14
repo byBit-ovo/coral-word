@@ -16,6 +16,7 @@ type LearningStat struct {
     NextReviewTime     time.Time // 下次复习时间
 }
 
+
 // ReviewItem 复习队列项
 type ReviewItem struct {
     Stat        *LearningStat
@@ -23,8 +24,13 @@ type ReviewItem struct {
     ScheduledAt int       // 轮次 (1,2,3...)
 }
 
+const (
+	REVIEWING = iota
+	REVIEW_OVER	
+)
 // ReviewSession 会话状态
 type ReviewSession struct {
+	Status 		int
     SessionID   string
     BookID      string
     ReviewQueue []*ReviewItem
@@ -65,18 +71,16 @@ func (s *ReviewSession) GetNext() *ReviewItem {
 
 // SubmitAnswer 提交并更新进度
 // 简化：直接在 ReviewSession 里处理逻辑，不用每次都去 DB 查一遍 stats
-func (s *ReviewSession) SubmitAnswer(item *ReviewItem, isCorrect bool) error {
+func (s *ReviewSession) SubmitAnswer(item *ReviewItem, isCorrect bool) {
     stat := item.Stat
-    updateAlgorithm(stat, isCorrect)
-    // 实时存库（也可以考虑 Session 结束统一存，但实时更安全）
-    return saveProgress(s.SessionID, s.BookID, stat)
+    updateFamiAndNextReview(stat, isCorrect)
 }
 
 // ---------------------------------------------------------------------------
 // 算法逻辑 (SM-2 简化)
 // ---------------------------------------------------------------------------
 
-func updateAlgorithm(s *LearningStat, isCorrect bool) {
+func updateFamiAndNextReview(s *LearningStat, isCorrect bool) {
     if isCorrect {
         s.ConsecutiveCorrect++
         if s.Familiarity < 5 {
@@ -185,10 +189,26 @@ func fetchReviewStats(uid, bookID string, limit int) ([]*ReviewItem, error) {
     return list, nil
 }
 
-func saveProgress(uid, bookID string, s *LearningStat) error {
-    _, err := db.Exec(
-        "UPDATE learning_record SET familiarity=?, consecutive_correct=?, next_review_time=?, total_reviews=total_reviews+1, last_review_time=NOW() WHERE user_id=? AND book_id=? AND word_id=?",
-        s.Familiarity, s.ConsecutiveCorrect, s.NextReviewTime, uid, bookID, s.WordID,
-    )
-    return err
+func saveProgress(uid, bookID string, stats []*ReviewItem) error {
+	tx, err := db.Begin()
+	if err != nil{
+		return err
+	}
+	defer func(){
+		if err != nil{
+			tx.Rollback()
+		}
+	}()
+	for _, stat := range stats{
+		s := stat.Stat
+		_, err = tx.Exec(
+			"UPDATE learning_record SET familiarity=?, consecutive_correct=?, next_review_time=?, total_reviews=total_reviews+1, last_review_time=NOW() WHERE user_id=? AND book_id=? AND word_id=?",
+			s.Familiarity, s.ConsecutiveCorrect, s.NextReviewTime, uid, bookID, s.WordID,
+    	
+		)
+		if err != nil{
+			return err
+		}
+	}
+    return nil
 }
