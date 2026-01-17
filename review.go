@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"sort"
 	"time"
+	"log"
 )
 
 // LearningStat 对应 DB 记录，包含算法所需核心数据
@@ -33,7 +34,7 @@ const (
 // ReviewSession 会话状态
 type ReviewSession struct {
 	Status      int
-	SessionID   string
+	UserId    	string
 	BookID      string
 	BookName    string
 	ReviewQueue []*ReviewItem
@@ -43,7 +44,41 @@ type ReviewSession struct {
 // 用户登录成功后，将book_id和book_name保存起来
 // StartReview：开始复习
 // userNoteWords[uid][book_name] = []word_id
-func StartReview(uid, bookID string, limit int) (*ReviewSession, error) {
+
+func StartReview(sid string){
+	uid := userSession[sid]
+	review, err := GetReview(uid, userBookToId[uid+"_我的生词本"], 10)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for thisTurn := review.GetNext() ; thisTurn != nil; thisTurn = review.GetNext(){
+		fmt.Println(thisTurn.WordDesc.Word)
+		fmt.Println("0.认识 1.不认识 2.猜一猜")
+		choose := 0
+		_, err := fmt.Scan(&choose)
+		for err != nil{
+			fmt.Println("输入错误，请重试")
+			_, err = fmt.Scan(&choose)
+		}
+		switch choose{
+			case 0:
+				review.SubmitAnswer(thisTurn, true)
+				thisTurn.WordDesc.showWord()
+			case 1:
+				review.SubmitAnswer(thisTurn, false)
+				thisTurn.WordDesc.showWord()
+			case 2:
+				thisTurn.WordDesc.showExample()
+				fmt.Scan(&choose)
+				thisTurn.WordDesc.showWord()
+		}
+	}
+	err = review.saveProgress()
+	if err != nil{
+		fmt.Println(err)
+	}
+}
+func GetReview(uid, bookID string, limit int) (*ReviewSession, error) {
 	// 1. 获取需要复习的记录 (包含算法属性 + 单词详情)
 	stats, err := fetchReviewStats(uid, bookID, limit)
 	if err != nil {
@@ -57,7 +92,7 @@ func StartReview(uid, bookID string, limit int) (*ReviewSession, error) {
 	queue := generateQueue(stats)
 
 	return &ReviewSession{
-		SessionID:   uid, // 这里直接存 uid 更方便
+		UserId:   uid, 
 		BookID:      bookID,
 		ReviewQueue: queue,
 		CurrentIdx:  0,
@@ -79,6 +114,9 @@ func (s *ReviewSession) GetNext() *ReviewItem {
 func (s *ReviewSession) SubmitAnswer(item *ReviewItem, isCorrect bool) {
 	stat := item.Stat
 	updateFamiAndNextReview(stat, isCorrect)
+	if s.ReviewQueue[len(s.ReviewQueue)-1] == item {
+		s.Status = REVIEW_OVER
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -166,7 +204,7 @@ func fetchReviewStats(uid, bookID string, limit int) ([]*ReviewItem, error) {
 	LIMIT ?
 `
 	// 调试：打印查询参数
-	fmt.Printf("DEBUG fetchReviewStats: uid=%s, bookID=%s, limit=%d\n", uid, bookID, limit)
+	// fmt.Printf("DEBUG fetchReviewStats: uid=%s, bookID=%s, limit=%d\n", uid, bookID, limit)
 	rows, err := db.Query(query, uid, bookID, limit)
 	if err != nil {
 		return nil, errors.New("query learning_record and vocabulary error " + err.Error())
@@ -201,7 +239,7 @@ func fetchReviewStats(uid, bookID string, limit int) ([]*ReviewItem, error) {
 	return list, nil
 }
 
-func saveProgress(uid, bookID string, session *ReviewSession) error {
+func (session *ReviewSession) saveProgress() error {
 	if session.Status == REVIEWING {
 		return errors.New("session is not over")
 	}
@@ -216,15 +254,21 @@ func saveProgress(uid, bookID string, session *ReviewSession) error {
 	}()
 
 	stats := session.ReviewQueue
+	uid := session.UserId
+	bookId := session.BookID
 	for _, stat := range stats {
 		s := stat.Stat
 		_, err = tx.Exec(
 			"UPDATE learning_record SET familiarity=?, consecutive_correct=?, next_review_time=?, total_reviews=total_reviews+1, last_review_time=NOW() WHERE user_id=? AND book_id=? AND word_id=?",
-			s.Familiarity, s.ConsecutiveCorrect, s.NextReviewTime, uid, bookID, s.WordID,
+			s.Familiarity, s.ConsecutiveCorrect, s.NextReviewTime, uid, bookId, s.WordID,
 		)
 		if err != nil {
 			return err
 		}
+	}
+	// 提交事务
+	if err = tx.Commit(); err != nil {
+		return err
 	}
 	return nil
 }

@@ -15,6 +15,11 @@ type User struct{
 	Id string `json:"id"`
 	Name string `json:"name"`
 	Pswd string `json:"pswd"`
+	SessionId 	string
+}
+
+func (user *User) reviewWords(){
+	StartReview(user.SessionId)
 }
 
 func userRegister(name, pswd string)(*User, error){
@@ -106,19 +111,21 @@ func listNoteWords(uid string)error{
 	}
 	return nil
 }
-func userLogin(name, pswd string)(string,error){
+func userLogin(name, pswd string)(*User,error){
 	user, err:= selectUser(name)
 	if err != nil{
-		return "",fmt.Errorf("User: %s doesn't exist", name)
+		return nil,fmt.Errorf("User: %s doesn't exist", name)
 	}
 	if user.Pswd != pswd{
-		return "", errors.New("incorrect password")
+		return nil, errors.New("incorrect password")
 	}
 	sessionId := uuid.New().String()
 	userSession[sessionId] = user.Id
+	user.SessionId = sessionId
 	listNoteWords(user.Id)
-	fmt.Println("Login successfully!")
-	return sessionId, nil
+	
+	// fmt.Println("Login successfully!")
+	return user, nil
 }
 
 func selectUser(name string) (*User, error){
@@ -155,7 +162,7 @@ func insertUser(name, pswd string) (*User, error){
 	if err = tx.Commit(); err != nil{
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
-	return &User{id,name,pswd}, nil
+	return &User{id,name,pswd,""}, nil
 }
 
 

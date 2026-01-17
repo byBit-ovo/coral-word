@@ -171,7 +171,7 @@ func QueryWord(word string) (*wordDesc, error){
 	return word_desc, nil
 }
 
-func showWord(word *wordDesc){
+func (word *wordDesc)showWord(){
 	fmt.Println("Source: ",llm.ModelsName[word.Source])
 	fmt.Println(word.Word, word.Pronunciation)
 	for _, def := range word.Definitions{
@@ -195,6 +195,11 @@ func showWord(word *wordDesc){
 		fmt.Println(phrase.Example + " " + phrase.Example_cn)
 	}
 	fmt.Println(word.Synonyms)
+}
+
+func (word *wordDesc) showExample(){
+	fmt.Println(word.Example)
+	fmt.Println(word.Example_cn)
 }
 
 

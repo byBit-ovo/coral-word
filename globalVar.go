@@ -13,3 +13,7 @@ var userNoteWords = map[string]map[string][]int64{}
 
 // uid_book_name -> book_id
 var userBookToId = map[string]string{}
+
+const (
+	NO_PENDING_REVIEWS = "no pending reviews for today"
+)

@@ -77,27 +77,30 @@ func sum(s []int, c chan int) {
 // 	return count
 
 // }
+
 func main() {
-	sid, err := userLogin("byBit", "1234567")
+	RyanQ, err := userLogin("byBit", "1234567")
 	// user, err := insertUser("byBit","200533")
 	if err != nil {
 		log.Fatal("insert user erro:", err)
 	}
+	RyanQ.reviewWords()
+	// AddWordToNotebook(sid, "formal","我的生词本")
+	// AddWordToNotebook(sid, "lever","我的生词本")
+	// AddWordToNotebook(sid, "sustain","我的生词本")
+	// AddWordToNotebook(sid, "cyber","我的生词本")
+	// AddWordToNotebook(sid, "confront","我的生词本")
+	// AddWordToNotebook(sid, "swift","我的生词本")
+	// AddWordToNotebook(sid, "kidnap","我的生词本")
+	
 	// sid = sid
 	// row := db.QueryRow("select next_review_time from learning_record where id = 3")
 
-	fmt.Println(userSession)
-	fmt.Println(userNoteWords)
-	fmt.Println(userBookToId)
-	fmt.Println(wordsPool)
-	uid := userSession[sid]
-	review, err := StartReview(uid, userBookToId[uid+"_我的生词本"], 10)
-	if err != nil {
-		log.Fatal("startReview error ",err)
-	}
-	for thisTurn := review.GetNext() ; thisTurn != nil; thisTurn = review.GetNext(){
-		
-	}
+	// fmt.Println(userSession)
+	// fmt.Println(userNoteWords)
+	// fmt.Println(userBookToId)
+	// fmt.Println(wordsPool)
+
 	
 }
 
