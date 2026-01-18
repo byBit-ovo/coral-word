@@ -63,14 +63,14 @@ func StartReview(sid string)map[string]bool{
 		switch choose{
 			case 0:
 				review.SubmitAnswer(thisTurn, true)
-				thisTurn.WordDesc.showWord()
+				thisTurn.WordDesc.show()
 			case 1:
 				review.SubmitAnswer(thisTurn, false)
-				thisTurn.WordDesc.showWord()
+				thisTurn.WordDesc.show()
 			case 2:
 				thisTurn.WordDesc.showExample()
 				fmt.Scan(&choose)
-				thisTurn.WordDesc.showWord()
+				thisTurn.WordDesc.show()
 		}
 	}
 	err = review.saveProgress()

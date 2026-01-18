@@ -75,8 +75,8 @@ func main() {
 		log.Fatal("insert user erro:", err)
 	}
 	// RyanQi.reviewWords()
-	// testWord([]string{"intellect"})
-	testArticle([]string{"good","bake","farm"})
+	testWord([]string{"intellect"})
+	// testArticle([]string{"good","bake","farm","aide"})
 
 	
 }

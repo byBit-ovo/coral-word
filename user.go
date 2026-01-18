@@ -4,8 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-
-	"github.com/byBit-ovo/coral_word/llm"
 	"github.com/google/uuid"
 	_ "github.com/pingcap/log"
 	_ "github.com/ydb-platform/ydb-go-sdk/v3/log"
