@@ -45,7 +45,7 @@ type ReviewSession struct {
 // StartReview：开始复习
 // userNoteWords[uid][book_name] = []word_id
 
-func StartReview(sid string){
+func StartReview(sid string)map[string]bool{
 	uid := userSession[sid]
 	review, err := GetReview(uid, userBookToId[uid+"_我的生词本"], 10)
 	if err != nil {
@@ -77,6 +77,11 @@ func StartReview(sid string){
 	if err != nil{
 		fmt.Println(err)
 	}
+	words := map[string]bool{}
+	for _,item := range review.ReviewQueue{
+		words[item.WordDesc.Word] = true
+	}
+	return words
 }
 func GetReview(uid, bookID string, limit int) (*ReviewSession, error) {
 	// 1. 获取需要复习的记录 (包含算法属性 + 单词详情)
@@ -267,6 +272,7 @@ func (session *ReviewSession) saveProgress() error {
 		}
 	}
 	// 提交事务
+	_, err = tx.Exec("update user set streak=streak+1 where id = ?", session.UserId)
 	if err = tx.Commit(); err != nil {
 		return err
 	}

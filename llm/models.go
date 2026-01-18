@@ -1,12 +1,14 @@
 package llm
 
-import(
-	"os"
-	_"fmt"
-	"log"
+import (
 	"context"
 	"errors"
-    "google.golang.org/genai"
+	_ "fmt"
+	"log"
+	"os"
+
+	"google.golang.org/genai"
+
 	// "github.com/openai/openai-go/v3"
 	// "github.com/openai/openai-go/v3/option"
 	"github.com/go-deepseek/deepseek"
@@ -15,20 +17,21 @@ import(
 	volModel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
 )
-func InitModels()error{
+
+func InitModels() error {
 	gemini_api_key = os.Getenv("GEMINI_API_KEY")
 	deepseek_api_key = os.Getenv("DEEPSEEK_API_KEY")
 	ark_api_key = os.Getenv("ARK_API_KEY")
 	dpModel, err := newAIModel(DEEP_SEEK)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	GmModel, err := newAIModel(GEMINI)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	ArkModel, err := newAIModel(ARK)
-	if err != nil{
+	if err != nil {
 		return err
 	}
 	Models[DEEP_SEEK] = dpModel
@@ -36,25 +39,34 @@ func InitModels()error{
 	Models[ARK] = ArkModel
 	return nil
 }
+
 var Models = map[int]AIModel{}
+
 const (
 	DEEP_SEEK = iota
 	GEMINI
 	ARK
 )
+
 var ModelsName = []string{
 	"deepseek",
 	"gemini",
 	"ark",
 }
+
 const (
 	WORD_QUERY = iota
+	ARTICLE_QUERY
 )
+
 type ModelType int
+
 var gemini_api_key string
 var deepseek_api_key string
 var ark_api_key string
-var json_format = `{
+
+var json_format_word = `{
+
 	"error":"false",
   	"word": "expose",
   	"pronunciation":"/ɪkˈspəʊz/"
@@ -101,19 +113,25 @@ var json_format = `{
     "unmask"
   ]
 }`
+var json_format_article = `
+	{
+		"error" : "xxx",
+		"article" :"xxx",
+		"article_cn" : "xxx"
+	}
+`
 var prompts = map[int]string{
-	WORD_QUERY: "请以这样的json格式回复我(不要带任何多余符号,标点符号都用英文回复):" + json_format +
-	",如果不存在这个单词,请将error设置为true,本次查询: ",
+	WORD_QUERY: "请以这样的json格式回复我(不要带任何多余符号,标点符号都用英文回复):" + json_format_word +
+		",如果不存在这个单词,请将error设置为true,本次查询: ",
+	ARTICLE_QUERY: `如果出错,请将error置为true,返回格式: ` + json_format_article +
+		"请生成一篇包含下面几个单词的英语短文和中文翻译，以纯文本形式返回，不需要带任何多余符号，帮助用户记忆这些单词，" + "单词列表: ",
 }
 
-
-
-
-func newAIModel(modelType ModelType) (AIModel, error){
-	switch modelType{
+func newAIModel(modelType ModelType) (AIModel, error) {
+	switch modelType {
 	case DEEP_SEEK:
 		client, err := deepseek.NewClient(deepseek_api_key)
-		if err != nil{
+		if err != nil {
 			return nil, err
 		}
 		return &DeepseekModel{client, deepseek_api_key}, nil
@@ -132,32 +150,35 @@ func newAIModel(modelType ModelType) (AIModel, error){
 	}
 	return nil, errors.New("Model not found")
 }
+
 // AIModel defines the interface for querying word definitions
 type AIModel interface {
-    GetDefinition(string) (string, error)
+	QueryModel(string) (string, error)
+	GetWordDefWithJson(string) (string, error)
+	GetArticleWithJson([]string) (string, error)
 }
-type DeepseekModel struct{
-	client deepseek.Client
+type DeepseekModel struct {
+	client  deepseek.Client
 	api_key string
 }
-type GeminiModel struct{
+type GeminiModel struct {
 	api_key string
-	ctx context.Context
-	client *genai.Client
+	ctx     context.Context
+	client  *genai.Client
 }
-type VolcanoModel struct{
+type VolcanoModel struct {
 	client *arkruntime.Client
-	ctx context.Context
-
+	ctx    context.Context
 }
-func (ds *DeepseekModel) GetDefinition(word string) (string, error){
+
+func (ds *DeepseekModel) QueryModel(query string) (string, error) {
 	chatReq := &request.ChatCompletionsRequest{
 		Model:  deepseek.DEEPSEEK_CHAT_MODEL,
 		Stream: false,
 		Messages: []*request.Message{
 			{
 				Role:    "user",
-				Content: prompts[WORD_QUERY] + word, // set your input message
+				Content: query, // set your input message
 			},
 		},
 	}
@@ -167,40 +188,71 @@ func (ds *DeepseekModel) GetDefinition(word string) (string, error){
 	}
 	return chatResp.Choices[0].Message.Content, nil
 }
-func (gemini *GeminiModel)GetDefinition(word string) (string, error){
+func (ds *DeepseekModel) GetWordDefWithJson(word string) (string, error) {
+	return ds.QueryModel(prompts[WORD_QUERY] + word)
+}
+func (ds *DeepseekModel) GetArticleWithJson(words []string) (string, error) {
+	articleQuery := prompts[ARTICLE_QUERY]
+	for _, words := range words {
+		articleQuery += (words + " ")
+	}
+	return ds.QueryModel(articleQuery)
+}
+func (gemini *GeminiModel) QueryModel(query string) (string, error) {
 
-    result, err := gemini.client.Models.GenerateContent(
-        gemini.ctx,
-        "gemini-2.5-flash",
-        genai.Text(prompts[WORD_QUERY] + word),
-        nil,
-    )
-    if err != nil {
-        log.Fatal(err)
+	result, err := gemini.client.Models.GenerateContent(
+		gemini.ctx,
+		"gemini-2.5-flash",
+		genai.Text(query),
+		nil,
+	)
+	if err != nil {
+		log.Fatal(err)
 		return "", err
-    }
-    return result.Text()[8:len(result.Text())-4], nil
+	}
+	return result.Text()[8 : len(result.Text())-4], nil
+}
+func (gemini *GeminiModel) GetWordDefWithJson(word string) (string, error) {
+	return gemini.QueryModel(prompts[WORD_QUERY] + word)
+}
+func (gemini *GeminiModel) GetArticleWithJson(words []string) (string, error) {
+	articleQuery := prompts[ARTICLE_QUERY]
+	for _, words := range words {
+		articleQuery += (words + " ")
+	}
+	return gemini.QueryModel(articleQuery)
+}
+func (vo *VolcanoModel) QueryModel(query string) (string, error) {
+	req1 := volModel.CreateChatCompletionRequest{
+		Model: "doubao-seed-1-6-lite-251015", //替换为Model ID，请从文档获取 https://www.volcengine.com/docs/82379/1330310
+		Messages: []*volModel.ChatCompletionMessage{
+			{
+				Role: volModel.ChatMessageRoleUser,
+				Content: &volModel.ChatCompletionMessageContent{
+					StringValue: volcengine.String(query),
+				},
+			},
+		},
+	}
+
+	resp1, err := vo.client.CreateChatCompletion(vo.ctx, req1)
+	if err != nil {
+		log.Fatal(err)
+		return "", err
+	}
+	return *resp1.Choices[0].Message.Content.StringValue, nil
 }
 
-func (model *VolcanoModel)GetDefinition(word string) (string, error){
-	req1 := volModel.CreateChatCompletionRequest{
-       Model: "doubao-seed-1-6-lite-251015",  //替换为Model ID，请从文档获取 https://www.volcengine.com/docs/82379/1330310
-       Messages: []*volModel.ChatCompletionMessage{
-          {
-             Role: volModel.ChatMessageRoleUser,
-             Content: &volModel.ChatCompletionMessageContent{
-                StringValue: volcengine.String(prompts[WORD_QUERY] + word),
-             },
-          },
-       },
-    }
+func (vo *VolcanoModel) GetWordDefWithJson(word string) (string, error) {
+	return vo.QueryModel(prompts[WORD_QUERY] + word)
+}
 
-    resp1, err := model.client.CreateChatCompletion(model.ctx, req1)
-    if err != nil {
-		log.Fatal(err)
-       	return "", err
-    }
-	return *resp1.Choices[0].Message.Content.StringValue, nil
+func (vo *VolcanoModel) GetArticleWithJson(words []string) (string, error) {
+	articleQuery := prompts[ARTICLE_QUERY]
+	for _, words := range words {
+		articleQuery += (words + " ")
+	}
+	return vo.QueryModel(articleQuery)
 }
 
 // client := openai.NewClient(
@@ -216,7 +268,6 @@ func (model *VolcanoModel)GetDefinition(word string) (string, error){
 // 	panic(err.Error())
 // }
 // println(chatCompletion.Choices[0].Message.Content)
-
 
 // var doubao_seed_1_8_251215 = "doubao-seed-1-8-251215"
 // var doubao_seed_code_preview_251028 = "doubao-seed-code-preview-251028"
@@ -247,4 +298,3 @@ func (model *VolcanoModel)GetDefinition(word string) (string, error){
 //     }
 //     fmt.Println(*resp1.Choices[0].Message.Content.StringValue)
 // }
-

@@ -15,7 +15,23 @@ import (
 	_ "strconv"
 	_ "time"
 )
-
+func testArticle(words []string){
+	article, err := GetArticleDesc(words)
+	if err != nil || article.Err == "true"{
+		log.Fatal("GetArticle error: " ,err)
+	}
+	fmt.Println(article.Article)
+	fmt.Println(article.Article_cn)
+}
+func testWord(words []string){
+	for _, word := range words{
+		res, err := QueryWord(word)
+		if err != nil{
+			log.Fatal(err)
+		}
+		res.show()
+	}
+}
 func init() {
 	err := godotenv.Load(".env")
 	if err != nil {
@@ -52,113 +68,19 @@ func sum(s []int, c chan int) {
 	}
 	c <- sum // send sum to c
 }
-// func testQuery()int{
-// 	query := `SELECT 
-// 		lr.word_id
-// 	FROM learning_record lr
-// 	JOIN vocabulary v ON lr.word_id = v.id
-// 	WHERE lr.user_id = ? AND lr.book_id = ? 
-// 		AND (lr.next_review_time <= NOW() OR lr.next_review_time IS NULL)
-// 	ORDER BY lr.familiarity ASC, lr.next_review_time ASC
-// 	LIMIT ?
-// 	`
-// 	rows, err := db.Query(query, "64a3a609-85d3-44ff-8f41-4efcd7a4a975", "a758ac1b-029a-44f8-a3e8-5e3646a2e6e5", 10)
-// 	if err != nil {
-
-// 	}
-// 	count := 0
-// 	for rows.Next(){
-// 		wordId := 0
-// 		if err := rows.Scan(&wordId); err != nil{
-// 			log.Fatal("scan error ", err.Error())
-// 		}
-// 		count += 1
-// 	}
-// 	return count
-
-// }
 
 func main() {
-	RyanQ, err := userLogin("byBit", "1234567")
-	// user, err := insertUser("byBit","200533")
+	_, err := userLogin("byBit", "1234567")
 	if err != nil {
 		log.Fatal("insert user erro:", err)
 	}
-	RyanQ.reviewWords()
-	// AddWordToNotebook(sid, "formal","我的生词本")
-	// AddWordToNotebook(sid, "lever","我的生词本")
-	// AddWordToNotebook(sid, "sustain","我的生词本")
-	// AddWordToNotebook(sid, "cyber","我的生词本")
-	// AddWordToNotebook(sid, "confront","我的生词本")
-	// AddWordToNotebook(sid, "swift","我的生词本")
-	// AddWordToNotebook(sid, "kidnap","我的生词本")
-	
-	// sid = sid
-	// row := db.QueryRow("select next_review_time from learning_record where id = 3")
-
-	// fmt.Println(userSession)
-	// fmt.Println(userNoteWords)
-	// fmt.Println(userBookToId)
-	// fmt.Println(wordsPool)
+	// RyanQi.reviewWords()
+	// testWord([]string{"intellect"})
+	testArticle([]string{"good","bake","farm"})
 
 	
 }
 
-func timeTest() {
-		// createNoteBook(sid,"我的生词本")
-	// err = AddWordToNotebook(sid,"suspect","我的生词本")
-	// err = AddWordToNotebook(sid,"suppress","我的生词本")
-	// err = AddWordToNotebook(sid,"empathy","我的生词本")
-		// s := []int{7, 2, 8, -9, 4, 0}
-
-	// c := make(chan int)
-	// go sum(s[:len(s)/2], c)
-	// go sum(s[len(s)/2:], c)
-	// x, y := <-c, <-c // receive from c
-	// fmt.Println(x, y, x+y)
-
-	// now := time.Now()
-
-	// fmt.Println("当前时间:", now)
-	// fmt.Println("年:", now.Year())
-	// fmt.Println("月:", now.Month())
-	// fmt.Println("日:", now.Day())
-	// fmt.Println("时:", now.Hour())
-	// fmt.Println("分:", now.Minute())
-	// fmt.Println("秒:", now.Second())
-	// fmt.Println("纳秒:", now.Nanosecond())
-	// fmt.Println("星期:", now.Weekday())
-	// fmt.Println("Unix时间戳:", now.Unix())
-	// fmt.Println("Unix毫秒:", now.UnixMilli())
-	// fmt.Println(now.Format("2006-01-02"))           // 2024-01-15
-	// fmt.Println(now.Format("2006-01-02 15:04:05"))  // 2024-01-15 14:30:45
-	// fmt.Println(now.Format("2006/01/02"))           // 2024/01/15
-	// fmt.Println(now.Format("15:04:05"))             // 14:30:45
-	// fmt.Println(now.Format("2006年01月02日"))        // 2024年01月15日
-	// fmt.Println(now.Format(time.RFC3339))           // 2024-01-15T14:30:45+08:00
-
-	// 12小时制
-	// fmt.Println(now.Format("03:04:05 PM"))
-	// // if err := createNoteBook(sid, "我的生词本"); err != nil{
-	// // 	fmt.Println("create_book error: ", err.Error())
-	// // }
-	// words := []string{"rely","doom","reveal","debate","metabolism","cyber","stock"}
-	// for _,word := range words{
-	// 	if err := AddWordToNotebook(sid,word,"我的生词本");err != nil{
-	// 		fmt.Println("AddWordNoteBook error: ", err.Error())
-	// 	}
-	// }
-	// fmt.Println(userSession)
-	// fmt.Println(wordsPool)
-	// fmt.Println(userNoteWords)
-	// fmt.Println("sessionId: ", sid)
-	// id := uuid.New().String()
-	// fmt.Println(id)
-	// testGin()
-	// word := "set"
-	// updateQuery := fmt.Sprintf("update vocabulary set hit_count=hit_count+1 where word = '%s' ", word)
-	// fmt.Println(updateQuery)
-}
 
 func esSearch() {
 	query := map[string]interface{}{

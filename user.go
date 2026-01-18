@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/byBit-ovo/coral_word/llm"
 	"github.com/google/uuid"
-	_"github.com/pingcap/log"
-	_"github.com/ydb-platform/ydb-go-sdk/v3/log"
+	_ "github.com/pingcap/log"
+	_ "github.com/ydb-platform/ydb-go-sdk/v3/log"
 )
 
 
@@ -19,7 +20,15 @@ type User struct{
 }
 
 func (user *User) reviewWords(){
-	StartReview(user.SessionId)
+	Uniquewords := StartReview(user.SessionId)
+	words := []string{}
+	for word,_ := range Uniquewords{
+		words = append(words, word)
+	}
+	article, err := GetArticleDesc(words)
+	if err != nil{
+		article.show()
+	}
 }
 
 func userRegister(name, pswd string)(*User, error){

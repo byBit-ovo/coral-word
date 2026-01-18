@@ -2,7 +2,7 @@ package main
 import (
 	"fmt"
 	"github.com/byBit-ovo/coral_word/llm"
-	"encoding/json"
+	_"encoding/json"
 	"sort"
 )
 
@@ -150,51 +150,43 @@ type wordDesc struct{
 
 func QueryWord(word string) (*wordDesc, error){
 	word_desc, err := selectWordByName(word)
-	choseModel := llm.DEEP_SEEK
 	if err != nil{
-		json_rsp, err := llm.Models[choseModel].GetDefinition(word)
-		if err != nil{
-			return nil, err
-		}
-		word_desc = &wordDesc{}
-		word_desc.Source = choseModel
-		err = json.Unmarshal([]byte(json_rsp), word_desc)
-		if err != nil || word_desc.Err == "true"{
-			return nil, err
-		}
+		word_desc, err = GetWordDesc(word)
 		err = insertWord(word_desc)
 		if err != nil{
 			return nil, err
 		}
 	}
-
 	return word_desc, nil
 }
 
-func (word *wordDesc)showWord(){
+func (word *wordDesc)show(){
 	fmt.Println("Source: ",llm.ModelsName[word.Source])
 	fmt.Println(word.Word, word.Pronunciation)
+	fmt.Print("TAG: ")
+	for _, tag := range word.Exam_tags{
+		fmt.Print(tag + " ")
+	}
+	fmt.Println()
 	for _, def := range word.Definitions{
-		fmt.Println(def.Pos)
+		fmt.Print(def.Pos," ")
 		for _, meaning := range def.Meanings{
 			fmt.Print(meaning + " ")
 		} 
 		fmt.Println()
 	}
+	fmt.Print("派生词汇: ")
 	for _, der := range word.Derivatives{
 		fmt.Print(der+" ")
 	}
 	fmt.Println()
-	for _, tag := range word.Exam_tags{
-		fmt.Print(tag + " ")
-	}
-	fmt.Println()
-	fmt.Println(word.Example)
-	fmt.Println(word.Example_cn)
+	fmt.Println("E.G.", word.Example)
+	fmt.Println("翻译: ",word.Example_cn)
 	for _, phrase := range word.Phrases{
 		fmt.Println(phrase.Example + " " + phrase.Example_cn)
 	}
-	fmt.Println(word.Synonyms)
+	fmt.Println("同义词: ", word.Synonyms)
+	fmt.Println("-------------------------------------------------------------")
 }
 
 func (word *wordDesc) showExample(){
