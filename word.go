@@ -11,8 +11,22 @@ type Definition struct{
 	Meanings []string   `json:"meaning"`
 }
 type Phrase struct{
-	Example string 			`json:"example"`
+	Example string 		`json:"example"`
 	Example_cn string 	`json:"example_cn"`
+}
+// wordNote should be separated from wordDesc cus everyUser has their own note
+type wordDesc struct{
+	Err string `json:"error"`
+	Word string `json:"word"`
+	Pronunciation string `json:"pronunciation"`
+	Definitions []Definition `json:"definitions"`
+	Derivatives []string `json:"derivatives"`
+	Exam_tags   []string `json:"exam_tags"`
+	Example 	string   `json:"example"`
+	Example_cn 	string   `json:"example_cn"`
+	Phrases  	[]Phrase `json:"phrases"`
+	Synonyms    []string `json:"synonyms"`
+	Source 		int
 }
 const(
 	TagZsb = 1 << iota
@@ -133,19 +147,7 @@ func TagsFromMask(mask int64) []string{
     }
 	return tags
 }
-type wordDesc struct{
-	Err string `json:"error"`
-	Word string `json:"word"`
-	Pronunciation string `json:"pronunciation"`
-	Definitions []Definition `json:"definitions"`
-	Derivatives []string `json:"derivatives"`
-	Exam_tags   []string `json:"exam_tags"`
-	Example 	string   `json:"example"`
-	Example_cn 	string   `json:"example_cn"`
-	Phrases  	[]Phrase `json:"phrases"`
-	Synonyms    []string `json:"synonyms"`
-	Source 		int
-}
+
 
 
 func QueryWord(word string) (*wordDesc, error){
