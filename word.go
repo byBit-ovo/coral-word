@@ -27,6 +27,7 @@ type wordDesc struct{
 	Phrases  	[]Phrase `json:"phrases"`
 	Synonyms    []string `json:"synonyms"`
 	Source 		int
+	WordID 		int64
 }
 const(
 	TagZsb = 1 << iota
@@ -51,13 +52,13 @@ func insertWord(word *wordDesc)(err error){
 	if err != nil {
     	return err
 	}
-	word_id, err := res.LastInsertId()
+	word.WordID, err = res.LastInsertId()
 	if err != nil{
 		return err
 	}
 	for _, def := range word.Definitions{
 		for _,tr := range def.Meanings{
-			res, err = tx.Exec(`insert into vocabulary_cn (word_id, translation, pos) values (?,?,?)`,word_id,tr,def.Pos)
+			res, err = tx.Exec(`insert into vocabulary_cn (word_id, translation, pos) values (?,?,?)`,word.WordID,tr,def.Pos)
 			if err != nil{
 				return err
 			}
@@ -82,7 +83,7 @@ func insertWord(word *wordDesc)(err error){
 		if i>=3 {
 			break
 		}
-		res, err = tx.Exec(`insert into derivatives (word_id, der) values (?,?)`,word_id, pair.word)
+		res, err = tx.Exec(`insert into derivatives (word_id, der) values (?,?)`,word.WordID, pair.word)
 		if err != nil{
 			return err
 		}
@@ -91,13 +92,13 @@ func insertWord(word *wordDesc)(err error){
 		if i >= 3{
 			break
 		}
-		res, err = tx.Exec("insert into synonyms (word_id, syn) values (?, ?)", word_id, syn)
+		res, err = tx.Exec("insert into synonyms (word_id, syn) values (?, ?)", word.WordID, syn)
 		if err != nil{
 			return err
 		}
 
 	}
-	res, err = tx.Exec("insert into example (word_id, sentence, translation) values (?,?,?)", word_id, word.Example,word.Example_cn)
+	res, err = tx.Exec("insert into example (word_id, sentence, translation) values (?,?,?)", word.WordID, word.Example,word.Example_cn)
 	if err != nil{
 		return err
 	}
@@ -105,7 +106,7 @@ func insertWord(word *wordDesc)(err error){
 		if i >=5{
 			break
 		}
-		res, err = tx.Exec("insert into phrases (word_id, phrase, translation) values (?,?,?)", word_id, phrase.Example,phrase.Example_cn)
+		res, err = tx.Exec("insert into phrases (word_id, phrase, translation) values (?,?,?)", word.WordID, phrase.Example,phrase.Example_cn)
 		if err != nil{
 			return err
 		}
@@ -153,11 +154,14 @@ func TagsFromMask(mask int64) []string{
 func QueryWord(word string) (*wordDesc, error){
 	word_desc, err := selectWordByName(word)
 	if err != nil{
+		//query from llm
 		word_desc, err = GetWordDesc(word)
-		err = insertWord(word_desc)
 		if err != nil{
 			return nil, err
 		}
+		//insert into database
+		err = insertWord(word_desc)
+		return word_desc, err
 	}
 	return word_desc, nil
 }

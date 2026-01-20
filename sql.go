@@ -100,7 +100,6 @@ func selectWordById(wordID int64)(w *wordDesc, err error){
 }
 
 func selectWordByName(word string) (w *wordDesc, err error) {
-    var wordID int64
     w = &wordDesc{}
     var tag int64
     tx, err := db.Begin()
@@ -115,10 +114,10 @@ func selectWordByName(word string) (w *wordDesc, err error) {
 	source := 0
     // 查询主表
     row := tx.QueryRow("SELECT id, word, pronunciation, tag, source FROM vocabulary WHERE word = ?", word)
-    if err = row.Scan(&wordID, &w.Word, &w.Pronunciation, &tag, &source); err != nil {
+    if err = row.Scan(&w.WordID, &w.Word, &w.Pronunciation, &tag, &source); err != nil {
         return nil, err
     }
-	if err = aggWord(w,tx,wordID,tag);err != nil{
+	if err = aggWord(w,tx,w.WordID,tag);err != nil{
 		return nil, err
 	}
 	if err = tx.Commit(); err != nil {

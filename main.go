@@ -14,6 +14,7 @@ import (
 	"log"
 	_ "strconv"
 	_ "time"
+	"os"
 )
 func testArticle(words []string){
 	article, err := GetArticleDesc(words)
@@ -44,21 +45,6 @@ func init() {
 	if err = InitSQL(); err != nil {
 		log.Fatal("Init SQL error")
 	}
-	// var word *wordDesc
-	// if word,err = selectWordById(18);err != nil{
-	// 	fmt.Println(err)
-	// }
-	// showWord(word)
-	// if err = InitEs(); err != nil{
-	// 	log.Fatal("Init es error: ", err)
-	// }
-	// json_rsp, err := llm.Models[llm.GEMINI].GetDefinition("empathy")
-	// fmt.Println(json_rsp)
-	// word, err := QueryWord("insulate")
-	// if err != nil{
-	// 	log.Fatal(err)
-	// }
-	// showWord(word)
 
 }
 func sum(s []int, c chan int) {
@@ -70,15 +56,19 @@ func sum(s []int, c chan int) {
 }
 
 func main() {
-	// RyanQi, err := userLogin("byBit", "1234567")
-	// if err != nil {
-	// 	log.Fatal("insert user erro:", err)
-	// }
-	// RyanQi.reviewWords()
-	testWord([]string{"contagious","conventional"})
-	// testArticle([]string{"I","love","you"})
-
+	pswd := os.Getenv("RYANQI_PSWD")
+	RyanQi, err := userLogin("RyanQi", pswd)
 	
+	if err != nil {
+		log.Fatal("insert user erro:", err)
+	}
+	words, err := RyanQi.GetSelectedWordNotes("cooperate")
+	if err != nil {
+		log.Fatal("get selected word notes error:", err)
+	}
+	for _, word := range words {
+		fmt.Println(word.UserName, word.Note)
+	}
 }
 
 
