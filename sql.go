@@ -71,6 +71,7 @@ func minDistance(word1 string, word2 string) int {
     return dfs(0,0)
 }
 
+// 
 func selectWordById(wordID int64)(w *wordDesc, err error){
     w = &wordDesc{}
     var tag int64
@@ -93,6 +94,7 @@ func selectWordById(wordID int64)(w *wordDesc, err error){
 	if err = aggWord(w,tx,wordID,tag);err != nil{
 		return nil, err
 	}
+	w.WordID = wordID
 	if err = tx.Commit(); err != nil {
         return nil,err
     }

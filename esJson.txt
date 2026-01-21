@@ -1,0 +1,15 @@
+GET /word_desc/_doc/_search
+{
+  "query": {
+    "match_all": {}
+  }
+}
+
+
+
+GET /user/_doc/_search
+{
+  "query": {
+    "match_all": {}
+  }
+}
