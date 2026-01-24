@@ -44,10 +44,12 @@ func (client *RedisWordClient) HGet(word string) (int64, error) {
 }
 
 // word: wordId
-func (client *RedisWordClient) HGetAll(word string) (map[string]string, error) {
+func (client *RedisWordClient) HGetAll() (map[string]string, error) {
 	return client.client.HGetAll(context.Background(), "coral_word").Result()
 }
-
+func (client *RedisWordClient) HDel(word string) error {
+	return client.client.HDel(context.Background(), "coral_word", word).Err()
+}
 
 func (client *RedisWordClient) HLen() (int64, error) {
 	return client.client.HLen(context.Background(), "coral_word").Result()

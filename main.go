@@ -6,11 +6,10 @@ import (
 	_ "context"
 	_ "database/sql"
 	_ "encoding/json"
-	_"fmt"
 	"log"
 	"os"
 	_ "strconv"
-	_ "time"
+	"time"
 
 	"github.com/byBit-ovo/coral_word/llm"
 	_ "github.com/go-sql-driver/mysql"
@@ -76,11 +75,11 @@ func main() {
 	if err != nil {
 		log.Fatal("userLogin error:", err)
 	}
-	words, err := esClient.SearchWordDescFuzzy("希望", 10)	
+	err = syncMissingFromLogs()
 	if err != nil {
-		log.Fatal("FuzzySearch error:", err)
+		log.Fatal("syncMissingFromLogs error:", err)
 	}
-	for _, w := range words {
-		w.show()
-	}
+	go checkSyncLog()
+	time.Sleep(100 * time.Second)
+
 }

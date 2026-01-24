@@ -4,6 +4,7 @@ import (
 	"github.com/byBit-ovo/coral_word/llm"
 	_"encoding/json"
 	"sort"
+	"log"
 )
 
 type Definition struct{
@@ -161,6 +162,21 @@ func QueryWord(word string) (*wordDesc, error){
 		}
 		//insert into database
 		err = insertWord(word_desc)
+		if err != nil{
+			log.Fatal("insertWord error:", err)
+			return nil, err
+		}
+		//insert into es
+		err = esClient.IndexWordDesc(word_desc)
+		if err != nil{
+			log.Fatal("esClient.IndexWordDesc error:", err)
+			return nil, err
+		}
+		//insert into redis
+		if err = redisWordClient.HSet(word_desc.Word,word_desc.WordID); err != nil{
+			log.Fatal("redisWordClient.HSet error:", err)
+			return nil, err
+		}
 		return word_desc, err
 	}
 	return word_desc, nil

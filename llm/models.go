@@ -136,7 +136,6 @@ func (vo *VolcanoModel) QueryModel(query string) (string, error) {
 
 	resp1, err := vo.client.CreateChatCompletion(vo.ctx, req1)
 	if err != nil {
-		log.Fatal(err)
 		return "", err
 	}
 	return *resp1.Choices[0].Message.Content.StringValue, nil

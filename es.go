@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
 	"github.com/elastic/go-elasticsearch/v9"
 	"github.com/elastic/go-elasticsearch/v9/esapi"
 )
@@ -115,14 +116,14 @@ func (es *EsClient) DeleteWordById(wordID int64) error {
 		strconv.FormatInt(wordID, 10),
 		es.client.Delete.WithRefresh("true"),
 	)
-	if res.StatusCode==404{
+	if res.StatusCode == 404 {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
 	defer res.Body.Close()
-	
+
 	if res.IsError() {
 		return parseEsError(res)
 	}
@@ -158,7 +159,7 @@ func (es *EsClient) DeleteWordByName(word string) error {
 		es.client.DeleteByQuery.WithRefresh(true),
 	)
 	//如果删除的目标不存在，则直接忽略
-	if res.StatusCode==404{
+	if res.StatusCode == 404 {
 		return nil
 	}
 	if err != nil {
@@ -171,19 +172,13 @@ func (es *EsClient) DeleteWordByName(word string) error {
 	return nil
 }
 
-// test over
-func (es *EsClient) SearchWordDescByWord(word string) ([]wordDesc, error) {
+// 以这个接口为base,设计其他搜索接口
+// 1. 拼写错误
+// 2. 前缀搜索
+// 3. 汉语意思搜索
+func (es *EsClient) searchBaseOnQuery(query map[string]interface{}) ([]wordDesc, error) {
 	if es.client == nil {
 		return nil, errors.New("es client not initialized")
-	}
-
-	query := map[string]interface{}{
-		"query": map[string]interface{}{
-			"match": map[string]interface{}{
-				"word": word,
-			},
-		},
-		"size": 10,
 	}
 	body, err := json.Marshal(query)
 	if err != nil {
@@ -218,10 +213,7 @@ func (es *EsClient) SearchWordDescByWord(word string) ([]wordDesc, error) {
 	return results, nil
 }
 
-// 以这个接口为base,设计其他搜索接口
-// 1. 拼写错误
-// 2. 前缀搜索
-// 3. 汉语意思搜索
+// test over
 func (es *EsClient) SearchWordDescFuzzy(word string, size int) ([]wordDesc, error) {
 	if es.client == nil {
 		return nil, errors.New("es client not initialized")
@@ -246,41 +238,71 @@ func (es *EsClient) SearchWordDescFuzzy(word string, size int) ([]wordDesc, erro
 		},
 		"size": size,
 	}
-	body, err := json.Marshal(query)
-	if err != nil {
-		return nil, err
-	}
-	res, err := es.client.Search(
-		es.client.Search.WithIndex(wordDescIndex),
-		es.client.Search.WithBody(bytes.NewReader(body)),
-		es.client.Search.WithTrackTotalHits(true),
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	if res.IsError() {
-		return nil, parseEsError(res)
-	}
-	var resp struct {
-		Hits struct {
-			Hits []struct {
-				Source wordDesc `json:"_source"`
-			} `json:"hits"`
-		} `json:"hits"`
-	}
-	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
-		return nil, err
-	}
-	results := make([]wordDesc, 0, len(resp.Hits.Hits))
-	for _, hit := range resp.Hits.Hits {
-		results = append(results, hit.Source)
-	}
-	return results, nil
+	return es.searchBaseOnQuery(query)
 }
 
-//第一次 search 拿到 scroll_id + 第一批数据，之后用 scroll_id 一批批拉完所有文档，只提取 _id。
-func (es *EsClient) SearchAllWordIDs(batchSize int) ([]int64, error) {
+// test over
+func (es *EsClient) SearchWordDescByWord(word string) ([]wordDesc, error) {
+	if es.client == nil {
+		return nil, errors.New("es client not initialized")
+	}
+
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"word": word,
+			},
+		},
+		"size": 10,
+	}
+	return es.searchBaseOnQuery(query)
+}
+
+// test over
+func (es *EsClient) SearchWordDescByWordPrefix(word string) ([]wordDesc, error) {
+	if es.client == nil {
+		return nil, errors.New("es client not initialized")
+	}
+	word = strings.TrimSpace(word)
+	if word == "" {
+		return nil, errors.New("empty search word")
+	}
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"prefix": map[string]interface{}{
+				"word": map[string]interface{}{
+					"value": word,
+				},
+			},
+		},
+		"size": 10,
+	}
+	return es.searchBaseOnQuery(query)
+}
+
+// test over
+func (es *EsClient) SearchWordDescByChineseMeaning(meaning string) ([]wordDesc, error) {
+	if es.client == nil {
+		return nil, errors.New("es client not initialized")
+	}
+	meaning = strings.TrimSpace(meaning)
+	if meaning == "" {
+		return nil, errors.New("empty search meaning")
+	}
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"match": map[string]interface{}{
+				"definitions.meaning": meaning,
+			},
+		},
+		"size": 10,
+	}
+	return es.searchBaseOnQuery(query)
+}
+
+// test over
+// 第一次 search 拿到 scroll_id + 第一批数据，之后用 scroll_id 一批批拉完所有文档，提取 _id 和 word。
+func (es *EsClient) SearchAllWordIDs(batchSize int) (map[int64]string, error) {
 	if es.client == nil {
 		return nil, errors.New("es client not initialized")
 	}
@@ -297,7 +319,7 @@ func (es *EsClient) SearchAllWordIDs(batchSize int) ([]int64, error) {
 				"_doc": "asc",
 			},
 		},
-		"_source": false,
+		"_source": []string{"word"},
 	}
 	body, err := json.Marshal(query)
 	if err != nil {
@@ -319,7 +341,10 @@ func (es *EsClient) SearchAllWordIDs(batchSize int) ([]int64, error) {
 		ScrollID string `json:"_scroll_id"`
 		Hits     struct {
 			Hits []struct {
-				ID string `json:"_id"`
+				ID     string `json:"_id"`
+				Source struct {
+					Word string `json:"word"`
+				} `json:"_source"`
 			} `json:"hits"`
 		} `json:"hits"`
 	}
@@ -327,6 +352,10 @@ func (es *EsClient) SearchAllWordIDs(batchSize int) ([]int64, error) {
 		return nil, err
 	}
 	scrollID := resp.ScrollID
+	// ES 的 scroll 会在服务器端保持一个游标（scroll ID），不清理会占用资源。
+	// 这段 defer 在函数结束时调用 ClearScroll，告诉 ES 释放这个 scroll：
+	// 防止内存/资源泄露
+	// 也是 ES 官方建议的做法
 	defer func() {
 		if scrollID == "" {
 			return
@@ -335,24 +364,27 @@ func (es *EsClient) SearchAllWordIDs(batchSize int) ([]int64, error) {
 			es.client.ClearScroll.WithScrollID(scrollID),
 		)
 	}()
-	ids := make([]int64, 0, len(resp.Hits.Hits))
-	appendIDs := func(hits []struct {
-		ID string `json:"_id"`
+	idToWord := make(map[int64]string, len(resp.Hits.Hits))
+	appendHits := func(hits []struct {
+		ID     string `json:"_id"`
+		Source struct {
+			Word string `json:"word"`
+		} `json:"_source"`
 	}) error {
 		for _, hit := range hits {
 			id, err := strconv.ParseInt(hit.ID, 10, 64)
 			if err != nil {
 				return err
 			}
-			ids = append(ids, id)
+			idToWord[id] = hit.Source.Word
 		}
 		return nil
 	}
-	if err := appendIDs(resp.Hits.Hits); err != nil {
+	if err := appendHits(resp.Hits.Hits); err != nil {
 		return nil, err
 	}
 	for len(resp.Hits.Hits) > 0 {
-			res, err = es.client.Scroll(
+		res, err = es.client.Scroll(
 			es.client.Scroll.WithScrollID(scrollID),
 			es.client.Scroll.WithScroll(time.Minute),
 		)
@@ -367,7 +399,10 @@ func (es *EsClient) SearchAllWordIDs(batchSize int) ([]int64, error) {
 			ScrollID string `json:"_scroll_id"`
 			Hits     struct {
 				Hits []struct {
-					ID string `json:"_id"`
+					ID     string `json:"_id"`
+					Source struct {
+						Word string `json:"word"`
+					} `json:"_source"`
 				} `json:"hits"`
 			} `json:"hits"`
 		}{}
@@ -377,11 +412,11 @@ func (es *EsClient) SearchAllWordIDs(batchSize int) ([]int64, error) {
 		if resp.ScrollID != "" {
 			scrollID = resp.ScrollID
 		}
-		if err := appendIDs(resp.Hits.Hits); err != nil {
+		if err := appendHits(resp.Hits.Hits); err != nil {
 			return nil, err
 		}
 	}
-	return ids, nil
+	return idToWord, nil
 }
 
 func parseEsError(res *esapi.Response) error {
