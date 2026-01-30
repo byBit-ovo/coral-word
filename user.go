@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-
+	"log"
 	"github.com/google/uuid"
 	_ "github.com/pingcap/log"
 	_ "github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -19,12 +19,12 @@ type User struct {
 
 // if word not in database, query from llm and insert into database
 func (user *User) CreateWordNote(wordName string, note string) error {
-	word_desc, err := QueryWord(wordName)
+	word_desc, err := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
 	wordNote := WordNote{
-		WordID:   word_desc.WordID,
+		WordID:   word_desc[wordName].WordID,
 		UserID:   user.Id,
 		UserName: user.Name,
 		Note:     note,
@@ -35,12 +35,12 @@ func (user *User) CreateWordNote(wordName string, note string) error {
 
 // test over
 func (user *User) UpdateWordNote(wordName string, note string) error {
-	word_desc, err := QueryWord(wordName)
+	word_desc, err := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
 	wordNote := WordNote{
-		WordID: word_desc.WordID,
+		WordID: word_desc[wordName].WordID,
 		UserID: user.Id,
 		Note:   note,
 	}
@@ -49,12 +49,12 @@ func (user *User) UpdateWordNote(wordName string, note string) error {
 
 // test over
 func (user *User) DeleteWordNote(wordName string) error {
-	word_desc, err := QueryWord(wordName)
+	word_desc, err := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
 	wordNote := WordNote{
-		WordID:   word_desc.WordID,
+		WordID:   word_desc[wordName].WordID,
 		UserID:   user.Id,
 		Note:     "",
 		Selected: false,
@@ -64,16 +64,19 @@ func (user *User) DeleteWordNote(wordName string) error {
 
 // test over
 func (user *User) GetWordNote(wordName string) (*WordNote, error) {
-	word_desc, err := QueryWord(wordName)
+	word_desc, err := QueryWords(wordName)
 	if err != nil {
+		log.Println("QueryWords error:", err)
 		return nil, err
 	}
 	wordNote := WordNote{
-		WordID: word_desc.WordID,
+		WordID: word_desc[wordName].WordID,
 		UserID: user.Id,
 	}
+	// fmt.Println(wordNote.WordID, wordNote.UserID)
 	err = wordNote.GetWordNote()
 	if err != nil {
+		log.Println("GetWordNote error:", err)
 		return nil, err
 	}
 	return &wordNote, nil
@@ -81,12 +84,12 @@ func (user *User) GetWordNote(wordName string) (*WordNote, error) {
 
 // test over
 func (user *User) AppendWordNote(wordName string, note string) error {
-	word_desc, err := QueryWord(wordName)
+	word_desc, err := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
 	wordNote := WordNote{
-		WordID: word_desc.WordID,
+		WordID: word_desc[wordName].WordID,
 		UserID: user.Id,
 	}
 	return wordNote.AppendNote(note)
@@ -96,12 +99,12 @@ func (user *User) AppendWordNote(wordName string, note string) error {
 // test over
 func (user *User) SetSelectedWordNote(wordName string, selected bool) error {
 	// get word_id from database
-	word_desc, err := QueryWord(wordName)
+	word_desc, err := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
 	wordNote := WordNote{
-		WordID:   word_desc.WordID,
+		WordID:   word_desc[wordName].WordID,
 		UserID:   user.Id,
 		Selected: selected,
 	}
@@ -126,21 +129,22 @@ func (user *User) reviewWords() {
 	}
 }
 
-func userRegister(name, pswd string) (*User, error) {
-	user, _ := selectUser(name)
-	if user != nil {
-		return user, fmt.Errorf("user:%s has registered, please login", name)
+func (user *User) userRegister() error {
+	new_user, _ := selectUser(user.Name)
+	if new_user != nil {
+		return fmt.Errorf("user:%s has registered, please login", user.Name)
 	}
-	user, err := insertUser(name, pswd)
+	new_user, err := insertUser(user.Name, user.Pswd)
+	user.Id = new_user.Id
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return user, nil
+	return nil
 
 }
-func selectNoteBooks(uid string) (map[string]string, error) {
+func (user *User) selectNoteBooks() (map[string]string, error) {
 
-	rows, err := db.Query("select book_id,book_name from note_book where user_id=?", uid)
+	rows, err := db.Query("select book_id,book_name from note_book where user_id=?", user.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -186,64 +190,72 @@ func selectNoteWords(books map[string]string) (map[string][]int64, error) {
 }
 
 // should be called when a new user login
-func listNoteWords(uid string) error {
-	//book_id->book_name
-	books, err := selectNoteBooks(uid)
-	if err != nil {
-		return err
-	}
-	for k, v := range books {
-		// uid_bookname: book_id
-		userBookToId[uid+"_"+v] = k
-	}
-	//book_name->[]word_ids
-	noteWords, err := selectNoteWords(books)
-	if err != nil {
-		return err
-	}
-	userNoteWords[uid] = noteWords
+// func listNoteWords(uid string) error {
+// 	//book_id->book_name
+// 	books, err := selectNoteBooks(uid)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	for k, v := range books {
+// 		// uid_bookname: book_id
+// 		userBookToId[uid+"_"+v] = k
+// 	}
+// 	//book_name->[]word_ids
+// 	noteWords, err := selectNoteWords(books)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	userNoteWords[uid] = noteWords
 
-	var allWordIDs []int64
-	seen := make(map[int64]struct{})
-	for _, words := range userNoteWords[uid] {
-		for _, word_id := range words {
-			if _, ok := seen[word_id]; ok {
-				continue
-			}
-			seen[word_id] = struct{}{}
-			allWordIDs = append(allWordIDs, word_id)
-		}
+//		var allWordIDs []int64
+//		seen := make(map[int64]struct{})
+//		for _, words := range userNoteWords[uid] {
+//			for _, word_id := range words {
+//				if _, ok := seen[word_id]; ok {
+//					continue
+//				}
+//				seen[word_id] = struct{}{}
+//				allWordIDs = append(allWordIDs, word_id)
+//			}
+//		}
+//		if len(allWordIDs) == 0 {
+//			return nil
+//		}
+//		wordMap, err := selectWordsByIds(allWordIDs...)
+//		if err != nil {
+//			return err
+//		}
+//		for wordID, wordDesc := range wordMap {
+//			wordsPool[wordID] = wordDesc
+//			wordNameToID[wordDesc.Word] = wordID
+//		}
+//		return nil
+//	}
+func (user *User) userLogin() error {
+	u, err := selectUser(user.Name)
+	if err != nil {
+		return fmt.Errorf("User: %s doesn't exist", user.Name)
 	}
-	if len(allWordIDs) == 0 {
-		return nil
+	if user.Pswd != u.Pswd {
+		return errors.New("incorrect password")
 	}
-	wordMap, err := selectWordsByIds(allWordIDs...)
+	sessionId := uuid.New().String()
+	err = redisClient.SetUserSession(sessionId, u.Id)
+	user.SessionId = sessionId
+	user.Id = u.Id
 	if err != nil {
 		return err
 	}
-	for wordID, wordDesc := range wordMap {
-		wordsPool[wordID] = wordDesc
-		wordNameToID[wordDesc.Word] = wordID
+	// listNoteWords(user.Id)
+	return nil
+}
+func (user *User) userLogout() error {
+	err := redisClient.DelUserSession(user.SessionId)
+	if err != nil {
+		return fmt.Errorf("failed to delete user session: %w", err)
 	}
 	return nil
 }
-func userLogin(name, pswd string) (*User, error) {
-	user, err := selectUser(name)
-	if err != nil {
-		return nil, fmt.Errorf("User: %s doesn't exist", name)
-	}
-	if user.Pswd != pswd {
-		return nil, errors.New("incorrect password")
-	}
-	sessionId := uuid.New().String()
-	err = redisWordClient.SetUserSession(sessionId, user.Id)
-	if err != nil {
-		return nil, err
-	}
-	listNoteWords(user.Id)
-	return &User{user.Id, user.Name, user.Pswd, sessionId}, nil
-}
-
 func selectUser(name string) (*User, error) {
 	row := db.QueryRow("select id, name, pswd from user where name=?", name)
 	user := &User{}

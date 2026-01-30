@@ -10,7 +10,7 @@ func testGin() {
 	router := gin.Default()
 	router.GET("/search/:word", func(c *gin.Context) {
 		word := c.Param("word")
-		word_desc, err := QueryWord(word)
+		word_desc, err := QueryWords(word)
 		if err != nil {
 			// 返回错误响应
 			c.JSON(http.StatusInternalServerError, gin.H{

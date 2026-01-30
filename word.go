@@ -1,36 +1,41 @@
 package main
+
 import (
+	_ "encoding/json"
 	"fmt"
-	"github.com/byBit-ovo/coral_word/llm"
-	_"encoding/json"
-	"sort"
 	"log"
+	"sort"
+	"strings"
+
+	"github.com/byBit-ovo/coral_word/llm"
 )
 
-type Definition struct{
-	Pos string 			`json:"pos"`
-	Meanings []string   `json:"meaning"`
+type Definition struct {
+	Pos      string   `json:"pos"`
+	Meanings []string `json:"meaning"`
 }
-type Phrase struct{
-	Example string 		`json:"example"`
-	Example_cn string 	`json:"example_cn"`
+type Phrase struct {
+	Example    string `json:"example"`
+	Example_cn string `json:"example_cn"`
 }
+
 // wordNote should be separated from wordDesc cus everyUser has their own note
-type wordDesc struct{
-	Err string `json:"error"`
-	Word string `json:"word"`
-	Pronunciation string `json:"pronunciation"`
-	Definitions []Definition `json:"definitions"`
-	Derivatives []string `json:"derivatives"`
-	Exam_tags   []string `json:"exam_tags"`
-	Example 	string   `json:"example"`
-	Example_cn 	string   `json:"example_cn"`
-	Phrases  	[]Phrase `json:"phrases"`
-	Synonyms    []string `json:"synonyms"`
-	Source 		int
-	WordID 		int64
+type wordDesc struct {
+	Err           string       `json:"error"`
+	Word          string       `json:"word"`
+	Pronunciation string       `json:"pronunciation"`
+	Definitions   []Definition `json:"definitions"`
+	Derivatives   []string     `json:"derivatives"`
+	Exam_tags     []string     `json:"exam_tags"`
+	Example       string       `json:"example"`
+	Example_cn    string       `json:"example_cn"`
+	Phrases       []Phrase     `json:"phrases"`
+	Synonyms      []string     `json:"synonyms"`
+	Source        int
+	WordID        int64
 }
-const(
+
+const (
 	TagZsb = 1 << iota
 	TagCET4
 	TagCET6
@@ -38,200 +43,221 @@ const(
 	TagPostgrad
 )
 
-func insertWord(word *wordDesc)(err error){
-	tags := aggregateTags(word.Exam_tags)
+func insertWords(words ...*wordDesc) (err error) {
+	if len(words) == 0 {
+		return nil
+	}
+	vocs := make([]interface{}, 0, 4*len(words))
+	placeholderGroups := make([]string, len(words))
+	for i, w := range words {
+		vocs = append(vocs, w.Word, w.Pronunciation, aggregateTags(w.Exam_tags), w.Source)
+		placeholderGroups[i] = "(?, ?, ?, ?)"
+	}
+
 	tx, err := db.Begin()
 	if err != nil {
-    	return err
-	}
-	defer func() { 
-		if err != nil{
-			_ = tx.Rollback() 
-		}
-	}()
-	res, err := tx.Exec(`insert into vocabulary (word, pronunciation, tag, source) values (?,?,?,?)`, word.Word, word.Pronunciation, tags,word.Source)
-	if err != nil {
-    	return err
-	}
-	word.WordID, err = res.LastInsertId()
-	if err != nil{
 		return err
 	}
-	for _, def := range word.Definitions{
-		for _,tr := range def.Meanings{
-			res, err = tx.Exec(`insert into vocabulary_cn (word_id, translation, pos) values (?,?,?)`,word.WordID,tr,def.Pos)
-			if err != nil{
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	placeholders := strings.Join(placeholderGroups, ",")
+	res, err := tx.Exec("insert into vocabulary (word, pronunciation, tag, source) values "+placeholders, vocs...)
+	if err != nil {
+		return err
+	}
+
+	firstID, err := res.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	for i, w := range words {
+		w.WordID = firstID + int64(i)
+
+		for _, def := range w.Definitions {
+			for _, tr := range def.Meanings {
+				_, err = tx.Exec(`insert into vocabulary_cn (word_id, translation, pos) values (?,?,?)`, w.WordID, tr, def.Pos)
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		type wordPair struct {
+			distance int
+			word     string
+		}
+		pairs := []wordPair{}
+		for _, der := range w.Derivatives {
+			pairs = append(pairs, wordPair{minDistance(der, w.Word), der})
+		}
+		sort.Slice(pairs, func(i, j int) bool {
+			if pairs[i].distance != pairs[j].distance {
+				return pairs[i].distance < pairs[j].distance
+			}
+			return pairs[i].word < pairs[j].word
+		})
+		for k, pair := range pairs {
+			if k >= 3 {
+				break
+			}
+			_, err = tx.Exec(`insert into derivatives (word_id, der) values (?,?)`, w.WordID, pair.word)
+			if err != nil {
 				return err
 			}
 		}
 
-	}
-	type wordPair struct{
-		distance int
-		word string
-	}
-	pairs := []wordPair{}
-	for _,der := range(word.Derivatives){
-		pairs = append(pairs, wordPair{minDistance(der, word.Word),der})
-	}
-	sort.Slice(pairs, func(i, j int) bool{
-		if pairs[i].distance != pairs[j].distance{
-			return pairs[i].distance < pairs[j].distance
+		for k, syn := range w.Synonyms {
+			if k >= 3 {
+				break
+			}
+			_, err = tx.Exec("insert into synonyms (word_id, syn) values (?, ?)", w.WordID, syn)
+			if err != nil {
+				return err
+			}
 		}
-		return pairs[i].word < pairs[j].word
-	})
-	for i,pair := range pairs{
-		if i>=3 {
-			break
-		}
-		res, err = tx.Exec(`insert into derivatives (word_id, der) values (?,?)`,word.WordID, pair.word)
-		if err != nil{
-			return err
-		}
-	}
-	for i, syn := range word.Synonyms{
-		if i >= 3{
-			break
-		}
-		res, err = tx.Exec("insert into synonyms (word_id, syn) values (?, ?)", word.WordID, syn)
-		if err != nil{
+
+		_, err = tx.Exec("insert into example (word_id, sentence, translation) values (?,?,?)", w.WordID, w.Example, w.Example_cn)
+		if err != nil {
 			return err
 		}
 
-	}
-	res, err = tx.Exec("insert into example (word_id, sentence, translation) values (?,?,?)", word.WordID, word.Example,word.Example_cn)
-	if err != nil{
-		return err
-	}
-	for i, phrase := range word.Phrases{
-		if i >=5{
-			break
-		}
-		res, err = tx.Exec("insert into phrases (word_id, phrase, translation) values (?,?,?)", word.WordID, phrase.Example,phrase.Example_cn)
-		if err != nil{
-			return err
+		for k, phrase := range w.Phrases {
+			if k >= 5 {
+				break
+			}
+			_, err = tx.Exec("insert into phrases (word_id, phrase, translation) values (?,?,?)", w.WordID, phrase.Example, phrase.Example_cn)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return tx.Commit()
 }
 
-
-
-func aggregateTags(tags []string) int32{
+func aggregateTags(tags []string) int32 {
 	count := 0
-	for _, tag := range tags{
+	for _, tag := range tags {
 		switch tag {
-		case "专升本": count += TagZsb
-		case "四级": count += TagCET4
-		case "六级": count += TagCET6
-		case "雅思": count += TagIELTS
-		case "考研": count += TagPostgrad
+		case "专升本":
+			count += TagZsb
+		case "四级":
+			count += TagCET4
+		case "六级":
+			count += TagCET6
+		case "雅思":
+			count += TagIELTS
+		case "考研":
+			count += TagPostgrad
 		}
 	}
 	return int32(count)
 }
-func TagsFromMask(mask int64) []string{
+func TagsFromMask(mask int64) []string {
 	tags := []string{}
 	if mask&TagZsb != 0 {
-        tags = append(tags, "专升本")
-    }
-    if mask&TagCET4 != 0 {
-        tags = append(tags, "四级")
-    }
-    if mask&TagCET6 != 0 {
-        tags = append(tags, "六级")
-    }
-    if mask&TagIELTS != 0 {
-        tags = append(tags, "雅思")
-    }
-    if mask&TagPostgrad != 0 {
-        tags = append(tags, "考研")
-    }
+		tags = append(tags, "专升本")
+	}
+	if mask&TagCET4 != 0 {
+		tags = append(tags, "四级")
+	}
+	if mask&TagCET6 != 0 {
+		tags = append(tags, "六级")
+	}
+	if mask&TagIELTS != 0 {
+		tags = append(tags, "雅思")
+	}
+	if mask&TagPostgrad != 0 {
+		tags = append(tags, "考研")
+	}
 	return tags
 }
 
-
-
-func QueryWords(word ...string) (map[string]*wordDesc, error){
-	wordsInMysql := make([]string,0)
-	wordsToQuery := make([]string,0)
-	for _, w := range word{
-		if _, err := redisClient.HGetWord(w); err != nil{
+func QueryWords(word ...string) (map[string]*wordDesc, error) {
+	wordsInMysql := make([]string, 0)
+	wordsToQuery := make([]string, 0)
+	for _, w := range word {
+		if _, err := redisClient.HGetWord(w); err != nil {
 			wordsToQuery = append(wordsToQuery, w)
-		}else{
+		} else {
 			wordsInMysql = append(wordsInMysql, w)
 		}
-	}	
+	}
 	res, err := selectWordsByNames(wordsInMysql...)
-	if err != nil{
+	if err != nil {
 		return nil, err
 	}
 	//query from llm
-	if len(wordsToQuery) > 0{
-		for _, w := range wordsToQuery{
+	if len(wordsToQuery) > 0 {
+		wordsToInsert := make([]*wordDesc, len(wordsToQuery))
+		for i, w := range wordsToQuery {
 			wd, err := GetWordDesc(w)
-			if err != nil{
+			if err != nil {
 				return nil, err
 			}
+			wordsToInsert[i] = wd
 			res[w] = wd
 		}
 		//insert into database
-		err = insertWord(word_desc)
-		if err != nil{
+		err = insertWords(wordsToInsert...)
+		if err != nil {
 			log.Fatal("insertWord error:", err)
 			return nil, err
 		}
-		//insert into es
-		err = esClient.IndexWordDesc(word_desc)
-		if err != nil{
-			log.Fatal("esClient.IndexWordDesc error:", err)
-			return nil, err
+		for _,w := range wordsToInsert{
+			//insert into es
+			err = esClient.IndexWordDesc(w)
+			if err != nil {
+				log.Fatal("esClient.IndexWordDesc error:", err)
+				return nil, err
+			}
+			//insert into redis
+			if err = redisClient.HSetWord(w.Word, w.WordID); err != nil {
+				log.Fatal("redisWordClient.HSetWord error:", err)
+				return nil, err
+			}
 		}
-		//insert into redis
-		if err = redisWordClient.HSetWord(word_desc.Word,word_desc.WordID); err != nil{
-			log.Fatal("redisWordClient.HSetWord error:", err)
-			return nil, err
-		}
-		return word_desc, err
+
+
+		return res, err
 	}
-	return word_desc, nil
+	return res, nil
 }
 
-func (word *wordDesc)show(){
-	fmt.Println("Source: ",llm.ModelsName[word.Source])
+func (word *wordDesc) show() {
+	fmt.Println("Source: ", llm.ModelsName[word.Source])
 	fmt.Println(word.Word, word.Pronunciation)
 	fmt.Print("TAG: ")
-	for _, tag := range word.Exam_tags{
+	for _, tag := range word.Exam_tags {
 		fmt.Print(tag + " ")
 	}
 	fmt.Println()
-	for _, def := range word.Definitions{
-		fmt.Print(def.Pos," ")
-		for _, meaning := range def.Meanings{
+	for _, def := range word.Definitions {
+		fmt.Print(def.Pos, " ")
+		for _, meaning := range def.Meanings {
 			fmt.Print(meaning + " ")
-		} 
+		}
 		fmt.Println()
 	}
 	fmt.Print("派生词汇: ")
-	for _, der := range word.Derivatives{
-		fmt.Print(der+" ")
+	for _, der := range word.Derivatives {
+		fmt.Print(der + " ")
 	}
 	fmt.Println()
 	fmt.Println("E.G.", word.Example)
-	fmt.Println("翻译: ",word.Example_cn)
-	for _, phrase := range word.Phrases{
+	fmt.Println("翻译: ", word.Example_cn)
+	for _, phrase := range word.Phrases {
 		fmt.Println(phrase.Example + " " + phrase.Example_cn)
 	}
 	fmt.Println("同义词: ", word.Synonyms)
 	fmt.Println("-------------------------------------------------------------")
 }
 
-func (word *wordDesc) showExample(){
+func (word *wordDesc) showExample() {
 	fmt.Println(word.Example)
 	fmt.Println(word.Example_cn)
 }
-
-
-
-
-

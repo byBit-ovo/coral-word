@@ -151,7 +151,7 @@ func selectWordsByNames(words ...string) (map[string]*wordDesc, error) {
 			return nil, err
 		}
 		wordsByName[w.Word] = w
-        w.Exam_tags = TagsFromMask(tag)
+		w.Exam_tags = TagsFromMask(tag)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -171,16 +171,17 @@ func selectWordsByNames(words ...string) (map[string]*wordDesc, error) {
 	return wordsByName, nil
 }
 
-
 func aggWords(tx *sql.Tx, wordsByID map[int64]*wordDesc) error {
 	if len(wordsByID) == 0 {
 		return nil
 	}
 	placeholders := strings.Repeat("?,", len(wordsByID)-1) + "?"
 	args := make([]interface{}, len(wordsByID))
-	for i, w := range wordsByID {
-		args[i] = w.WordID
-    }
+	idx := 0
+	for i, _ := range wordsByID {
+		args[idx] = i
+		idx += 1
+	}
 	if _, err := tx.Exec("UPDATE vocabulary SET hit_count = hit_count + 1 WHERE id IN ("+placeholders+")", args...); err != nil {
 		return err
 	}

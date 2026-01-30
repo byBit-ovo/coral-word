@@ -57,9 +57,12 @@ func (client *RedisClient) HLenWords() (int64, error) {
 }
 
 func (client *RedisClient) SetUserSession(sessionId string, userId string) error {
-	return client.client.HSet(context.Background(), "coral_word_session:",sessionId, userId).Err()
+	return client.client.HSet(context.Background(), "coral_word_session",sessionId, userId).Err()
 }
 func (client *RedisClient) GetUserSession(sessionId string) (string, error) {
-	return client.client.HGet(context.Background(), "coral_word_session:",sessionId).Result()
+	return client.client.HGet(context.Background(), "coral_word_session",sessionId).Result()
+}
+func (client *RedisClient) DelUserSession(sessionId string) error {
+	return client.client.HDel(context.Background(), "coral_word_session", sessionId).Err()
 }
 

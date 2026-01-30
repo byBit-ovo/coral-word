@@ -14,6 +14,9 @@ type WordNote struct {
 }
 
 func (wn *WordNote) CreateWordNote() error {
+	if wn.UserID == ""{
+		return errors.New("user_id is empty")
+	}
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -103,11 +106,11 @@ func GetSelectedWordNotes(wordName string) ([]WordNote, error) {
 	wordNotes := []WordNote{}
 	wordID, ok := wordNameToID[wordName]
 	if !ok {
-		word_desc, err := QueryWord(wordName)
+		word_desc, err := QueryWords(wordName)
 		if err != nil {
 			return nil, err
 		}
-		wordID = word_desc.WordID
+		wordID = word_desc[wordName].WordID
 	}
 	rows, err := db.Query("select user_id, note from word_note where word_id = ? and selected = true", wordID)
 	if err != nil {
