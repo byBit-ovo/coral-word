@@ -16,6 +16,7 @@ import (
 	"github.com/volcengine/volcengine-go-sdk/service/arkruntime"
 	volModel "github.com/volcengine/volcengine-go-sdk/service/arkruntime/model"
 	"github.com/volcengine/volcengine-go-sdk/volcengine"
+	_"github.com/openai/openai-go/v3"
 )
 
 func InitModels() error {
@@ -117,13 +118,13 @@ func (gemini *GeminiModel) QueryModel(query string) (string, error) {
 		log.Fatal(err)
 		return "", err
 	}
-	return result.Text()[8 : len(result.Text())-4], nil
+	return result.Text(), nil
 }
 
 
 func (vo *VolcanoModel) QueryModel(query string) (string, error) {
 	req1 := volModel.CreateChatCompletionRequest{
-		Model: "doubao-seed-1-6-lite-251015", //替换为Model ID，请从文档获取 https://www.volcengine.com/docs/82379/1330310
+		Model: "deepseek-v3-2-251201", //替换为Model ID，请从文档获取 https://www.volcengine.com/docs/82379/1330310
 		Messages: []*volModel.ChatCompletionMessage{
 			{
 				Role: volModel.ChatMessageRoleUser,

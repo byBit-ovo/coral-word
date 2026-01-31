@@ -6,10 +6,10 @@ import(
 
 var db *sql.DB
 
-var userSession = map[string]string{}
+// var userSession = map[string]string{}
 
-var wordsPool = map[int64]*wordDesc{}
-var wordNameToID = map[string]int64{}
+// var wordsPool = map[int64]*wordDesc{}
+// var wordNameToID = map[string]int64{}
 //						 uid       ntbn    wordIds
 var userNoteWords = map[string]map[string][]int64{}
 

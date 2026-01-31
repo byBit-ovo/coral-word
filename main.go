@@ -1,20 +1,24 @@
 package main
 
 import (
+	_ "bufio"
 	_ "bytes"
 	_ "context"
 	_ "database/sql"
 	_ "encoding/json"
-	"log"
-	_ "strconv"
-	"time"
-	_"net/http"
 	"fmt"
+	"log"
+	_ "net/http"
+	_ "os"
+	_ "strconv"
+	_ "time"
+
 	"github.com/byBit-ovo/coral_word/llm"
-	_"github.com/gin-gonic/gin"
+	_ "github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/google/uuid"
 	"github.com/joho/godotenv"
+	_"strings"
 )
 
 func init() {
@@ -29,7 +33,7 @@ func init() {
 	if err = InitSQL(); err != nil {
 		log.Fatal("Init SQL error")
 	}
-	
+
 	if err = InitRedis(); err != nil {
 		log.Fatal("Init Redis error")
 	}
@@ -40,33 +44,31 @@ func init() {
 
 }
 
+func f1() {
+	x := 10
+	defer fmt.Println(x)
+	x = 20
+}
+func f2() {
+	x := 10
+	defer func() {
+		fmt.Println(x)
+	}()
+	x = 20
+}
 
 func main() {
-	// scaleUpWords(100)
-	// syncMissingFromLogs()
-	// checkSyncLog()
-	RyanQi := User{
-		Name: "RyanQi",
-		Pswd: "1234567",
-	}
-	err := RyanQi.userLogin()
-	if err != nil{
+	words, err, errWords := QueryWords("collaborate")
+	if err != nil {
 		log.Fatal(err)
 	}
-	
-	fmt.Println(RyanQi.SessionId)
-	user_id,err := redisClient.GetUserSession(RyanQi.SessionId)
-	if err != nil{
-		log.Fatal(err)
+	for _, word_desc := range words {
+		word_desc.show()
 	}
-	fmt.Println("user_id:",user_id)
-	note,err :=RyanQi.GetWordNote("reveal")
-	if err != nil{
-		log.Fatal(err)
+	if len(errWords) > 0 {
+		fmt.Println("error words:")
+		for _, word := range errWords {
+			fmt.Println(word)
+		}
 	}
-	fmt.Println(note.Note)
-	time.Sleep(10 * time.Second)
-	RyanQi.userLogout()
-
-
 }

@@ -5,6 +5,7 @@ import (
 	_ "errors"
 	"fmt"
 	"os"
+	"log"
 	_ "sort"
 	_ "strconv"
 	"strings"
@@ -292,7 +293,35 @@ func aggWords(tx *sql.Tx, wordsByID map[int64]*wordDesc) error {
 		return err
 	}
 	phraseRows.Close()
-
+	noteRows, err := tx.Query("select word_id, user_id, note from word_note where selected = true and word_id IN ("+placeholders+")", args...)
+	if err != nil{
+		return err
+	}
+	for noteRows.Next(){
+		var word_id int64
+		var user_id string
+		var note string
+		if err := noteRows.Scan(&word_id, &user_id, &note); err != nil{
+			noteRows.Close()
+			return err
+		}
+		userName, err := redisClient.GetUserName(user_id)
+		if err != nil{
+			log.Println("redisClient.GetUserName error:", err)
+			continue
+		}
+		if wordsByID[word_id].SelectedNotes == nil {
+			wordsByID[word_id].SelectedNotes = make(map[string]string)
+		}
+		wordsByID[word_id].SelectedNotes[userName] = note
+	}
+	if err := noteRows.Err(); err != nil {
+		noteRows.Close()
+		return err
+	}
+	if err := noteRows.Close(); err != nil {
+		log.Println("noteRows.Close error:", err)
+	}
 	for id, w := range wordsByID {
 		defPosMap := defMap[id]
 		if len(defPosMap) > 0 {
@@ -312,7 +341,30 @@ func aggWords(tx *sql.Tx, wordsByID map[int64]*wordDesc) error {
 	}
 	return nil
 }
-
+func deleteWordsFromMysql(words ...string) error {
+	if len(words) == 0 {
+		return nil
+	}
+	placeholders := strings.Repeat("?,", len(words)-1) + "?"
+	args := make([]interface{}, len(words))
+	for i, word := range words {
+		args[i] = word
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	_, err = tx.Exec("DELETE FROM vocabulary WHERE word IN ("+placeholders+")", args...)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
 // func selectWord(word string)(*wordDesc, error){
 // 	var word_id int32
 // 	word_desc := wordDesc{}

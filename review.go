@@ -46,7 +46,10 @@ type ReviewSession struct {
 // userNoteWords[uid][book_name] = []word_id
 
 func StartReview(sid string) map[string]bool {
-	uid := userSession[sid]
+	uid, err := redisClient.GetUserSession(sid)
+	if err != nil {
+		log.Fatal(err)
+	}
 	review, err := GetReview(uid, userBookToId[uid+"_我的生词本"], 10)
 	if err != nil {
 		log.Fatal(err)

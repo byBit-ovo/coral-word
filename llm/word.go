@@ -2,13 +2,13 @@ package llm
 
 
 func (ds *DeepseekModel) GetWordDefWithJson(word string) (string, error) {
-	return ds.QueryModel(prompts[WORD_QUERY] + word)
+	return ds.QueryModel(GetWordPrompt(word))
 }
 
 func (gemini *GeminiModel) GetWordDefWithJson(word string) (string, error) {
-	return gemini.QueryModel(prompts[WORD_QUERY] + word)
+	return gemini.QueryModel(GetWordPrompt(word))
 }
 
 func (vo *VolcanoModel) GetWordDefWithJson(word string) (string, error) {
-	return vo.QueryModel(prompts[WORD_QUERY] + word)
+	return vo.QueryModel(GetWordPrompt(word))
 }

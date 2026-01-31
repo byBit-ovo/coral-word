@@ -113,7 +113,7 @@ func apiWordQuery(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "word is empty")
 		return
 	}
-	wordDesc, err := QueryWords(word)
+	wordDesc, err, _ := QueryWords(word)
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, err.Error())
 		return
@@ -309,8 +309,8 @@ func getUserFromSession(c *gin.Context) (*User, error) {
 	if err != nil {
 		return nil, err
 	}
-	uid, ok := userSession[sid]
-	if !ok {
+	uid, err := redisClient.GetUserSession(sid)
+	if err != nil {
 		return nil, errors.New("invalid session_id")
 	}
 	user, err := selectUserByID(uid)

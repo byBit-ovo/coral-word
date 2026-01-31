@@ -7,6 +7,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"errors"
 )
 
 // mysql, elasticsearch, redis
@@ -133,36 +135,100 @@ func parseMissingLogLine(line string) (int64, string, error) {
 }
 
 // scale up words source pool
-func scaleUpWords(count int) error {
-	currentCount, err := redisClient.HLenWords()
-	if err != nil {
-		return err
+func scaleUpWords(count int, goroutineCount int) (map[string]*wordDesc, error, []string) {
+	errWords := make([]string,0)
+
+	if err := checkSyncLog(); err != nil {
+		return nil, errors.New("sync log is not empty, please sync first"), errWords
 	}
-	// currentCount := 10
 	file, err := os.OpenFile(os.Getenv("WORD_SOURCE_FILE"), os.O_RDONLY, 0644)
 	if err != nil {
-		log.Fatal("open file error:", err)
+		log.Println("open file error:", err)
+		return nil, err, errWords
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
-	//跳过已存在的word
-	for scanner.Scan() && currentCount != 0 {
-		currentCount -= 1
-	}
 	if err := scanner.Err(); err != nil {
-		return err
+		log.Println("scanner error:", err)
+		return nil, err, errWords
+	}	
+	res := make(map[string]*wordDesc)
+	wordsChan := make(chan string, count)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	if goroutineCount > 10{
+		goroutineCount = 10
 	}
-
-	wordsToQuery := make([]string, count)
-	for i := 0; i < count; i++ {
-		scanner.Scan()
-		wordsToQuery[i] = scanner.Text()
+	errSlice := make([]error,0)
+	var errMu sync.Mutex
+	for i:=0;i<goroutineCount;i++{
+		wg.Add(1)
+		go func(){
+			defer wg.Done()
+			assignment := make([]string,0)
+			for word := range wordsChan{
+				assignment = append(assignment, word)
+				if len(assignment) == 10{
+					portion, err,eWords := QueryWords(assignment...)
+					if err != nil{
+						errMu.Lock()
+						errSlice = append(errSlice, err)
+						if len(eWords) > 0{
+							errWords = append(errWords, eWords...)
+						}
+						errMu.Unlock()
+						return
+					}
+					mu.Lock()
+					for word, word_desc := range portion{
+						res[word] = word_desc
+					}
+					mu.Unlock()
+					assignment = make([]string,0)
+				}
+			}
+			if len(assignment) > 0{
+				portion, err,eWords := QueryWords(assignment...)
+				if err != nil{
+					errMu.Lock()
+					errSlice = append(errSlice, err)
+					if len(eWords) > 0{
+						errWords = append(errWords, eWords...)
+					}
+					errMu.Unlock()
+					return
+				}
+				mu.Lock()	
+				for word, word_desc := range portion{
+					res[word] = word_desc
+				}
+				mu.Unlock()
+			}
+		}()
 	}
-	_, err = QueryWords(wordsToQuery...)
-	return err
+	for count != 0 {
+		if scanner.Scan() == false{
+			break
+		}
+		word := scanner.Text()
+		if _, err := redisClient.HGetWord(word);err == nil{
+			continue
+		}
+		wordsChan<- word
+		count--
+	}
+	close(wordsChan)
+	wg.Wait()
+	if len(errSlice) > 0{
+		for _, err := range errSlice{
+			log.Println(err)
+		}
+		return nil, errors.New("scaleUpWords error"), errWords
+	}
+	return res, nil, errWords
 }
 
-func checkSyncLog() {
+func checkSyncLog() error {
 	file, _ := os.OpenFile("log/sync.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	defer file.Close()
 	logger := log.New(file, "", log.LstdFlags)
@@ -170,12 +236,12 @@ func checkSyncLog() {
 	wordsInRedis, err := redisClient.HGetAllWords()
 	if err != nil {
 		logger.Println("redisWordClient.HGetAllWords error:", err)
-		return
+		return err
 	}
 	rows, err := db.Query("SELECT id,word FROM vocabulary")
 	if err != nil {
 		logger.Println("db.Query error:", err)
-		return
+		return err
 	}
 	wordsInMysql := make(map[int64]string)
 	err = func() error {
@@ -192,12 +258,12 @@ func checkSyncLog() {
 	}()
 	if err != nil {
 		logger.Println("words in mysql error:", err)
-		return
+		return err
 	}
 	wordsInEs, err := esClient.SearchAllWordIDs(500)
 	if err != nil {
 		logger.Println("words in es error:", err)
-		return
+		return err
 	}
 
 	redisIDToWord := make(map[int64]string)
@@ -240,25 +306,27 @@ func checkSyncLog() {
 
 	if len(missing) == 0 {
 		logger.Println("Words are all synced")
+		return nil
 	} else {
 		logger.Println("Words are not synced, details are in missingWord")
 	}
 	esFile, err := os.OpenFile("log/missInEs.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		logger.Println("open es.log error:", err)
-		return
+		return err
 	}
 	defer esFile.Close()
 	mysqlFile, err := os.OpenFile("log/missInMysql.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		logger.Println("open mysql.log error:", err)
-		return
+		return err
+
 	}
 	defer mysqlFile.Close()
 	redisFile, err := os.OpenFile("log/missInRedis.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		logger.Println("open redis.log error:", err)
-		return
+		return err
 	}
 	defer redisFile.Close()
 	for id, sources := range missing {
@@ -277,4 +345,5 @@ func checkSyncLog() {
 			}
 		}
 	}
+	return nil
 }

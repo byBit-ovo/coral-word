@@ -66,3 +66,14 @@ func (client *RedisClient) DelUserSession(sessionId string) error {
 	return client.client.HDel(context.Background(), "coral_word_session", sessionId).Err()
 }
 
+func (client *RedisClient) SetUserName(userId string, userName string) error {
+	return client.client.HSet(context.Background(), "coral_word_user",userId,userName).Err()
+}
+func (client *RedisClient) GetUserName(userId string) (string, error) {
+	return client.client.HGet(context.Background(), "coral_word_user",userId).Result()
+}
+func (client *RedisClient) DelUserName(userId string) error {
+	return client.client.HDel(context.Background(), "coral_word_user", userId).Err()
+}
+
+

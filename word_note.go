@@ -104,9 +104,9 @@ func (wn *WordNote) SetSelectedWordNote(selected bool) error{
 
 func GetSelectedWordNotes(wordName string) ([]WordNote, error) {
 	wordNotes := []WordNote{}
-	wordID, ok := wordNameToID[wordName]
-	if !ok {
-		word_desc, err := QueryWords(wordName)
+	wordID, err := redisClient.HGetWord(wordName)
+	if err != nil {
+		word_desc, err,_ := QueryWords(wordName)
 		if err != nil {
 			return nil, err
 		}

@@ -19,7 +19,7 @@ type User struct {
 
 // if word not in database, query from llm and insert into database
 func (user *User) CreateWordNote(wordName string, note string) error {
-	word_desc, err := QueryWords(wordName)
+	word_desc, err,_ := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
@@ -35,7 +35,7 @@ func (user *User) CreateWordNote(wordName string, note string) error {
 
 // test over
 func (user *User) UpdateWordNote(wordName string, note string) error {
-	word_desc, err := QueryWords(wordName)
+	word_desc, err,_ := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
@@ -49,7 +49,7 @@ func (user *User) UpdateWordNote(wordName string, note string) error {
 
 // test over
 func (user *User) DeleteWordNote(wordName string) error {
-	word_desc, err := QueryWords(wordName)
+	word_desc, err,_ := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
@@ -64,7 +64,7 @@ func (user *User) DeleteWordNote(wordName string) error {
 
 // test over
 func (user *User) GetWordNote(wordName string) (*WordNote, error) {
-	word_desc, err := QueryWords(wordName)
+	word_desc, err,_ := QueryWords(wordName)
 	if err != nil {
 		log.Println("QueryWords error:", err)
 		return nil, err
@@ -81,10 +81,33 @@ func (user *User) GetWordNote(wordName string) (*WordNote, error) {
 	}
 	return &wordNote, nil
 }
+func (user *User) GetAllWordNotes() ([]WordNote, error) {
+	wordNotes := []WordNote{}
+	rows, err := db.Query("select word_id, note, selected from word_note where user_id = ?", user.Id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
 
+	for rows.Next() {
+		var word_id int64
+		var note string
+		var selected bool
+		if err := rows.Scan(&word_id,&note, &selected); err != nil {
+			return nil, err
+		}
+		wordNotes = append(wordNotes, WordNote{
+			WordID: word_id,
+			UserID: user.Id,
+			Note: note,
+			Selected: selected,
+		})
+	}
+	return wordNotes, nil
+}
 // test over
 func (user *User) AppendWordNote(wordName string, note string) error {
-	word_desc, err := QueryWords(wordName)
+	word_desc, err,_ := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
@@ -99,7 +122,7 @@ func (user *User) AppendWordNote(wordName string, note string) error {
 // test over
 func (user *User) SetSelectedWordNote(wordName string, selected bool) error {
 	// get word_id from database
-	word_desc, err := QueryWords(wordName)
+	word_desc, err,_ := QueryWords(wordName)
 	if err != nil {
 		return err
 	}
@@ -135,7 +158,12 @@ func (user *User) userRegister() error {
 		return fmt.Errorf("user:%s has registered, please login", user.Name)
 	}
 	new_user, err := insertUser(user.Name, user.Pswd)
+	if err != nil{
+		return err
+	}
+
 	user.Id = new_user.Id
+	err = redisClient.SetUserName(user.Id, user.Name)
 	if err != nil {
 		return err
 	}

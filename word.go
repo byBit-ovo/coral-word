@@ -33,6 +33,7 @@ type wordDesc struct {
 	Synonyms      []string     `json:"synonyms"`
 	Source        int
 	WordID        int64
+	SelectedNotes map[string]string 
 }
 
 const (
@@ -177,7 +178,7 @@ func TagsFromMask(mask int64) []string {
 	return tags
 }
 
-func QueryWords(word ...string) (map[string]*wordDesc, error) {
+func QueryWords(word ...string) (map[string]*wordDesc, error, []string) {
 	wordsInMysql := make([]string, 0)
 	wordsToQuery := make([]string, 0)
 	for _, w := range word {
@@ -187,45 +188,44 @@ func QueryWords(word ...string) (map[string]*wordDesc, error) {
 			wordsInMysql = append(wordsInMysql, w)
 		}
 	}
-	res, err := selectWordsByNames(wordsInMysql...)
-	if err != nil {
-		return nil, err
+	res := make(map[string]*wordDesc)
+	var err error
+	if len(wordsInMysql) > 0 {
+		res, err = selectWordsByNames(wordsInMysql...)
+		if err != nil {
+			return nil, err, nil
+		}
 	}
+	errWords := make([]string, 0)
 	//query from llm
 	if len(wordsToQuery) > 0 {
-		wordsToInsert := make([]*wordDesc, len(wordsToQuery))
-		for i, w := range wordsToQuery {
+		for _, w := range wordsToQuery {
 			wd, err := GetWordDesc(w)
 			if err != nil {
-				return nil, err
+				errWords = append(errWords, w)
+				continue
 			}
-			wordsToInsert[i] = wd
 			res[w] = wd
-		}
-		//insert into database
-		err = insertWords(wordsToInsert...)
-		if err != nil {
-			log.Fatal("insertWord error:", err)
-			return nil, err
-		}
-		for _,w := range wordsToInsert{
+			//insert into database
+			err = insertWords(wd)
+			if err != nil {
+				log.Fatal("insertWord error:", err)
+			}
 			//insert into es
-			err = esClient.IndexWordDesc(w)
+			err = esClient.IndexWordDesc(wd)
 			if err != nil {
 				log.Fatal("esClient.IndexWordDesc error:", err)
-				return nil, err
 			}
 			//insert into redis
-			if err = redisClient.HSetWord(w.Word, w.WordID); err != nil {
+			if err = redisClient.HSetWord(w, wd.WordID); err != nil {
 				log.Fatal("redisWordClient.HSetWord error:", err)
-				return nil, err
 			}
+
 		}
-
-
-		return res, err
+		log.Println("Total word count from llm:", len(wordsToQuery)-len(errWords))
+		return res, err, errWords
 	}
-	return res, nil
+	return res, nil, errWords
 }
 
 func (word *wordDesc) show() {
@@ -254,10 +254,34 @@ func (word *wordDesc) show() {
 		fmt.Println(phrase.Example + " " + phrase.Example_cn)
 	}
 	fmt.Println("同义词: ", word.Synonyms)
+	fmt.Println("精选用户笔记:***************************************************")
+	for userName, note := range word.SelectedNotes {
+		fmt.Println("用户: ", userName)
+		fmt.Println("笔记: ", note)
+	}
 	fmt.Println("-------------------------------------------------------------")
 }
 
 func (word *wordDesc) showExample() {
 	fmt.Println(word.Example)
 	fmt.Println(word.Example_cn)
+}
+
+
+func eliminateWords(words []string) error {
+	err := deleteWordsFromMysql(words...)
+	if err != nil {
+		return err
+	}
+	for _, w := range words{
+		err = esClient.DeleteWordByName(w)
+		if err != nil {
+			return err
+		}
+		err = redisClient.HDelWord(w)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }

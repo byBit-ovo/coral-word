@@ -7,8 +7,8 @@ import (
 )
 
 func createNoteBook(session string, bookName string) (err error) {
-	uid, ok := userSession[session]
-	if ok == false {
+	uid, err := redisClient.GetUserSession(session)
+	if err != nil {
 		return fmt.Errorf("user isn't logged in !")
 	}
 	tx, err := db.Begin()
@@ -29,8 +29,8 @@ func createNoteBook(session string, bookName string) (err error) {
 }
 
 func AddWordToNotebook(session, word, noteBookName string) (err error) {
-	uid, ok := userSession[session]
-	if ok == false {
+	uid, err := redisClient.GetUserSession(session)
+	if err != nil {
 		return fmt.Errorf("user isn't logged in !")
 	}
 	tx, err := db.Begin()
