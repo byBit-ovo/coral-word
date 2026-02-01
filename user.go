@@ -140,13 +140,13 @@ func (user *User) GetSelectedWordNotes(wordName string) ([]WordNote, error) {
 }
 
 // test over
-func (user *User) reviewWords() {
-	Uniquewords := StartReview(user.SessionId)
+func (user *User) reviewWords(bookName string) {
+	Uniquewords := StartReview(user.SessionId, bookName)
 	words := []string{}
 	for word, _ := range Uniquewords {
 		words = append(words, word)
 	}
-	article, err := GetArticleDesc(words)
+	article, err := GetArticleDescFromLLM(words)
 	if err != nil {
 		article.show()
 	}

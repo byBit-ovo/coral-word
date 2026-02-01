@@ -10,10 +10,11 @@ import (
 	_ "strconv"
 	"strings"
 
-	// "time"
+	"time"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/google/uuid"
 )
+var db *sql.DB
 
 func InitSQL() error {
 	var err error
@@ -30,6 +31,10 @@ func InitSQL() error {
 	if err != nil {
 		return err
 	}
+	// 在 InitSQL 中配置
+	db.SetMaxOpenConns(100) // 根据数据库配置调整
+	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(time.Hour)
 	return nil
 }
 func minDistance(word1 string, word2 string) int {

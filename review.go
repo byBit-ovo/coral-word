@@ -11,6 +11,12 @@ import (
 	"time"
 )
 
+const (
+	NO_PENDING_REVIEWS = "no pending reviews for today"
+)
+
+
+
 // LearningStat 对应 DB 记录，包含算法所需核心数据
 type LearningStat struct {
 	WordID             int64
@@ -45,12 +51,13 @@ type ReviewSession struct {
 // StartReview：开始复习
 // userNoteWords[uid][book_name] = []word_id
 
-func StartReview(sid string) map[string]bool {
+func StartReview(sid string, bookName string) map[string]bool {
 	uid, err := redisClient.GetUserSession(sid)
 	if err != nil {
 		log.Fatal(err)
 	}
-	review, err := GetReview(uid, userBookToId[uid+"_我的生词本"], 10)
+	bookId, err := redisClient.GetUserBookId(uid, bookName)
+	review, err := GetReview(uid, bookId, 10)
 	if err != nil {
 		log.Fatal(err)
 	}

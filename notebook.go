@@ -8,6 +8,7 @@ import (
 
 func createNoteBook(session string, bookName string) (err error) {
 	uid, err := redisClient.GetUserSession(session)
+	
 	if err != nil {
 		return fmt.Errorf("user isn't logged in !")
 	}

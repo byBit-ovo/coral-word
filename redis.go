@@ -76,4 +76,20 @@ func (client *RedisClient) DelUserName(userId string) error {
 	return client.client.HDel(context.Background(), "coral_word_user", userId).Err()
 }
 
+func (client *RedisClient) SetUserBook(userId, bookName, bookId string) error {
+	key := userId + "_" + bookName
+	return client.client.HSet(context.Background(), "coral_word_user_book",key,bookId).Err()
+}
+func (client *RedisClient) GetUserBookId(userId, bookName string) (string, error) {
+	key := userId + "_" + bookName
+	return client.client.HGet(context.Background(), "coral_word_user_book",key).Result()
+}
+func (client *RedisClient) DelUserBookId(userId, bookName string) error {
+	key := userId + "_" + bookName
+	return client.client.HDel(context.Background(), "coral_word_user_book", key).Err()
+}
+
+
+
+
 

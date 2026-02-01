@@ -176,7 +176,7 @@ func (es *EsClient) DeleteWordByName(word string) error {
 // 1. 拼写错误
 // 2. 前缀搜索
 // 3. 汉语意思搜索
-func (es *EsClient) searchBaseOnQuery(query map[string]interface{}) ([]wordDesc, error) {
+func (es *EsClient) searchBaseOnQuery(query map[string]interface{}) (map[string]*wordDesc, error) {
 	if es.client == nil {
 		return nil, errors.New("es client not initialized")
 	}
@@ -206,15 +206,15 @@ func (es *EsClient) searchBaseOnQuery(query map[string]interface{}) ([]wordDesc,
 	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
 		return nil, err
 	}
-	results := make([]wordDesc, 0, len(resp.Hits.Hits))
+	resultsMap := make(map[string]*wordDesc)
 	for _, hit := range resp.Hits.Hits {
-		results = append(results, hit.Source)
+		resultsMap[hit.Source.Word] = &hit.Source
 	}
-	return results, nil
+	return resultsMap, nil
 }
 
 // test over
-func (es *EsClient) SearchWordDescFuzzy(word string, size int) ([]wordDesc, error) {
+func (es *EsClient) SearchWordDescFuzzy(word string, size int) (map[string]*wordDesc, error) {
 	if es.client == nil {
 		return nil, errors.New("es client not initialized")
 	}
@@ -242,7 +242,7 @@ func (es *EsClient) SearchWordDescFuzzy(word string, size int) ([]wordDesc, erro
 }
 
 // test over
-func (es *EsClient) SearchWordDescByWord(word string) ([]wordDesc, error) {
+func (es *EsClient) SearchWordDescByWord(word string) (map[string]*wordDesc, error) {
 	if es.client == nil {
 		return nil, errors.New("es client not initialized")
 	}
@@ -258,8 +258,29 @@ func (es *EsClient) SearchWordDescByWord(word string) ([]wordDesc, error) {
 	return es.searchBaseOnQuery(query)
 }
 
+// GetWordDescByWordExact 按单词名精确查一条（term 查 word.keyword），用于读分流时从 ES 取详情。
+func (es *EsClient) GetWordDescByWordExact(word string) (*wordDesc, error) {
+	word = strings.TrimSpace(word)
+	if word == "" {
+		return nil, errors.New("empty word")
+	}
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"word.keyword": word,
+			},
+		},
+		"size": 1,
+	}
+	list, err := es.searchBaseOnQuery(query)
+	if err != nil || len(list) == 0 {
+		return nil, err
+	}
+	return list[word], nil
+}
+
 // test over
-func (es *EsClient) SearchWordDescByWordPrefix(word string) ([]wordDesc, error) {
+func (es *EsClient) SearchWordDescByWordPrefix(word string) (map[string]*wordDesc, error) {
 	if es.client == nil {
 		return nil, errors.New("es client not initialized")
 	}
@@ -281,7 +302,7 @@ func (es *EsClient) SearchWordDescByWordPrefix(word string) ([]wordDesc, error) 
 }
 
 // test over
-func (es *EsClient) SearchWordDescByChineseMeaning(meaning string) ([]wordDesc, error) {
+func (es *EsClient) SearchWordDescByChineseMeaning(meaning string) (map[string]*wordDesc, error) {
 	if es.client == nil {
 		return nil, errors.New("es client not initialized")
 	}

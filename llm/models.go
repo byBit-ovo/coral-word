@@ -69,7 +69,7 @@ func newAIModel(modelType ModelType) (AIModel, error) {
 // AIModel defines the interface for querying word definitions
 type AIModel interface {
 	QueryModel(string) (string, error)
-	GetWordDefWithJson(string) (string, error)
+	GetWordDefWithJson(...string) (string, error)
 	GetArticleWithJson([]string) (string, error)
 }
 

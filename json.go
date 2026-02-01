@@ -5,12 +5,10 @@ import (
 	"errors"
 	_"fmt"
 	"log"
+	"strings"
 
 	"github.com/byBit-ovo/coral_word/llm"
 	_ "github.com/ydb-platform/ydb-go-sdk/v3/log"
-)
-import (
-	"strings"
 )
 func processJson(jsonRsp string) string {
 	const (
@@ -35,25 +33,38 @@ func processJson(jsonRsp string) string {
 	return jsonRsp
 }
 
-func GetWordDesc(word string) (*wordDesc, error){
+
+
+func GetWordDescFromLLM(words ...string) (map[string]*wordDesc, error){
 	choseModel := llm.DEEP_SEEK
-	json_rsp, err := llm.Models[choseModel].GetWordDefWithJson(word)
+	json_rsp, err := llm.Models[choseModel].GetWordDefWithJson(words...)
 	if err != nil{
 		return nil, err
 	}
 	json_rsp = processJson(json_rsp)
 	// fmt.Println(json_rsp)
-	word_desc := &wordDesc{}
-	word_desc.Source = choseModel
-	err = json.Unmarshal([]byte(json_rsp), word_desc)
-	if err != nil || word_desc.Err == "true"{
+	var wrapper struct {
+		Words []*wordDesc `json:"words"`
+	}
+	wrapper.Words = make([]*wordDesc, len(words))
+	for i, _ := range wrapper.Words{
+		wrapper.Words[i] = &wordDesc{}
+		wrapper.Words[i].Source = choseModel
+		wrapper.Words[i].Word = words[i]
+	}
+	err = json.Unmarshal([]byte(json_rsp), &wrapper)
+	if err != nil {
 		log.Println("json.Unmarshal error:", err, json_rsp)
 		return nil, errors.New("llm returned error response")
 	}
-	return word_desc, nil
+	res := make(map[string]*wordDesc)
+	for _, word_desc := range wrapper.Words {
+		res[word_desc.Word] = word_desc
+	}
+	return res, nil
 }
 
-func GetArticleDesc(words []string) (*ArticleDesc, error){
+func GetArticleDescFromLLM(words []string) (*ArticleDesc, error){
 	choseModel := llm.DEEP_SEEK
 	json_rsp, err := llm.Models[choseModel].GetArticleWithJson(words)
 	json_rsp = processJson(json_rsp)

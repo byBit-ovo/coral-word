@@ -9,16 +9,18 @@ import (
 	"fmt"
 	"log"
 	_ "net/http"
-	_ "os"
+	"os"
 	_ "strconv"
+	"time"
 	_ "time"
 
+	"bufio"
 	"github.com/byBit-ovo/coral_word/llm"
 	_ "github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/google/uuid"
 	"github.com/joho/godotenv"
-	_"strings"
+	_ "strings"
 )
 
 func init() {
@@ -56,19 +58,44 @@ func f2() {
 	}()
 	x = 20
 }
+func test() {
+	LLMPool = NewPool(10, 200)
+	defer LLMPool.Shutdown()
 
-func main() {
-	words, err, errWords := QueryWords("collaborate")
+	words := []string{"revoke", "impose", "virtually", "profound"}
+	word_descs, err, errWords := QueryWords(words...)
 	if err != nil {
-		log.Fatal(err)
+		log.Println("QueryWords error:", err, "errWords:", errWords)
+		return
 	}
-	for _, word_desc := range words {
+	for _, word_desc := range word_descs {
 		word_desc.show()
 	}
-	if len(errWords) > 0 {
-		fmt.Println("error words:")
-		for _, word := range errWords {
-			fmt.Println(word)
+	time.Sleep(10 * time.Hour)
+}
+
+// LLMPool 全局协程池，用于查询 LLM 补全单词（用户查词时复用，避免每次起新 goroutine）
+var LLMPool *GoRoutinePool
+
+func main() {
+	LLMPool = NewPool(10, 200)
+	defer LLMPool.Shutdown()
+
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println("珊瑚英语单词查询系统,输入单词查询:")
+	for scanner.Scan() {
+		word := scanner.Text()
+		if word == "" {
+			fmt.Println("请输入单词查询:")
+			continue
+		}
+		word_descs, err, errWords := QueryWords(word)
+		if err != nil {
+			log.Println("QueryWords error:", err, "errWords:", errWords)
+			continue
+		}
+		for _, word_desc := range word_descs {
+			word_desc.show()
 		}
 	}
 }

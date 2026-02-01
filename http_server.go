@@ -220,7 +220,11 @@ func apiStartReview(c *gin.Context) {
 	}
 	_ = c.ShouldBindJSON(&req)
 	if req.BookID == "" {
-		req.BookID = userBookToId[user.Id+"_我的生词本"]
+		req.BookID, err = redisClient.GetUserBookId(user.Id, "我的生词本")
+		if err != nil {
+			respondError(c, http.StatusInternalServerError, err.Error())
+			return
+		}
 	}
 	if req.Limit <= 0 {
 		req.Limit = 10

@@ -2,13 +2,14 @@ package main
 
 import (
 	"bufio"
+	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
-	"errors"
 )
 
 // mysql, elasticsearch, redis
@@ -134,93 +135,171 @@ func parseMissingLogLine(line string) (int64, string, error) {
 	return id, wordStr, nil
 }
 
-// scale up words source pool
-func scaleUpWords(count int, goroutineCount int) (map[string]*wordDesc, error, []string) {
-	errWords := make([]string,0)
 
-	if err := checkSyncLog(); err != nil {
-		return nil, errors.New("sync log is not empty, please sync first"), errWords
+
+func scaleFromGoogle100000(count int) (map[string]*wordDesc, error, []string) {
+	words, err := readFromGoogle100000(count)
+	if err != nil {
+		return nil, err, nil
 	}
+	return scaleUpWords(LLMPool, words...)	
+}	
+
+
+func readFromGoogle100000(count int) ([]string, error) {
 	file, err := os.OpenFile(os.Getenv("WORD_SOURCE_FILE"), os.O_RDONLY, 0644)
 	if err != nil {
 		log.Println("open file error:", err)
-		return nil, err, errWords
+		return nil, err
 	}
 	defer file.Close()
 	scanner := bufio.NewScanner(file)
 	if err := scanner.Err(); err != nil {
 		log.Println("scanner error:", err)
-		return nil, err, errWords
+		return nil, err
 	}	
-	res := make(map[string]*wordDesc)
-	wordsChan := make(chan string, count)
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-	if goroutineCount > 10{
-		goroutineCount = 10
-	}
-	errSlice := make([]error,0)
-	var errMu sync.Mutex
-	for i:=0;i<goroutineCount;i++{
-		wg.Add(1)
-		go func(){
-			defer wg.Done()
-			assignment := make([]string,0)
-			for word := range wordsChan{
-				assignment = append(assignment, word)
-				if len(assignment) == 10{
-					portion, err,eWords := QueryWords(assignment...)
-					if err != nil{
-						errMu.Lock()
-						errSlice = append(errSlice, err)
-						if len(eWords) > 0{
-							errWords = append(errWords, eWords...)
-						}
-						errMu.Unlock()
-						return
-					}
-					mu.Lock()
-					for word, word_desc := range portion{
-						res[word] = word_desc
-					}
-					mu.Unlock()
-					assignment = make([]string,0)
-				}
-			}
-			if len(assignment) > 0{
-				portion, err,eWords := QueryWords(assignment...)
-				if err != nil{
-					errMu.Lock()
-					errSlice = append(errSlice, err)
-					if len(eWords) > 0{
-						errWords = append(errWords, eWords...)
-					}
-					errMu.Unlock()
-					return
-				}
-				mu.Lock()	
-				for word, word_desc := range portion{
-					res[word] = word_desc
-				}
-				mu.Unlock()
-			}
-		}()
-	}
-	for count != 0 {
-		if scanner.Scan() == false{
-			break
-		}
+	words := make([]string,0)
+	for scanner.Scan() && count != 0{
 		word := scanner.Text()
 		if _, err := redisClient.HGetWord(word);err == nil{
 			continue
 		}
-		wordsChan<- word
+		words = append(words, word)
 		count--
 	}
-	close(wordsChan)
-	wg.Wait()
-	if len(errSlice) > 0{
-		for _, err := range errSlice{
+	return words, nil
+}
+
+func QueryLLMAndInsertWords(words ...string) (map[string]*wordDesc, error, []string){
+	errWords := make([]string,0)
+	res := make(map[string]*wordDesc)
+	wordDescs, err := GetWordDescFromLLM(words...)
+	if err != nil{
+		return nil, err, errWords
+	}
+	for word, wordDesc := range wordDescs{
+		if wordDesc.Err == "true"{
+			errWords = append(errWords, word)
+			continue
+		}
+		err = insertWords(wordDesc)
+		if err != nil{
+			log.Println("insertWords error:", err)
+			continue
+		}
+		err = esClient.IndexWordDesc(wordDesc)
+		if err != nil{
+			log.Println("esClient.IndexWordDesc error:", err)
+			continue
+		}
+		err = redisClient.HSetWord(word, wordDesc.WordID)
+		if err != nil{
+			log.Println("redisClient.HSetWord error:", err)
+			continue
+		}
+		res[word] = wordDesc
+	}	
+	return res, nil, errWords
+}
+
+// scaleUpWords 用 LLM 补全单词：pool 非空时用协程池执行，否则起临时 goroutine。
+// 用户查词时传 LLMPool，批量导入等可传 nil 使用临时 worker。
+func scaleUpWords(pool *GoRoutinePool, words ...string) (map[string]*wordDesc, error, []string) {
+	errWords := make([]string, 0)
+	if err := checkSyncLog(); err != nil {
+		return nil, errors.New("sync log is not empty, please sync first"), errWords
+	}
+	res := make(map[string]*wordDesc)
+	var mu sync.Mutex
+	errSlice := make([]error, 0)
+	var errMu sync.Mutex
+
+	if pool != nil {
+		// 使用全局协程池：按批提交任务，等待全部完成
+		const batchSize = 10
+		var wg sync.WaitGroup
+		for i := 0; i < len(words); i += batchSize {
+			end := i + batchSize
+			if end > len(words) {
+				end = len(words)
+			}
+			batch := make([]string, end-i)
+			copy(batch, words[i:end])
+			wg.Add(1)
+			task := func(ctx context.Context) {
+				defer wg.Done()
+				portion, err, eWords := QueryLLMAndInsertWords(batch...)
+				mu.Lock()
+				for word, wd := range portion {
+					res[word] = wd
+				}
+				mu.Unlock()
+				if err != nil {
+					errMu.Lock()
+					errSlice = append(errSlice, err)
+					errWords = append(errWords, eWords...)
+					errMu.Unlock()
+				}
+			}
+			if !pool.Submit(task) {
+				wg.Done()
+				return nil, errors.New("pool closed or busy"), errWords
+			}
+		}
+		wg.Wait()
+	} else {
+		// 无池时：临时起 worker，逻辑与原实现一致
+		goRoutineCount := 10
+		wordsChan := make(chan string, len(words))
+		var wg sync.WaitGroup
+		for i := 0; i < goRoutineCount; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				assignment := make([]string, 0)
+				for word := range wordsChan {
+					assignment = append(assignment, word)
+					if len(assignment) == 10 {
+						portion, err, eWords := QueryLLMAndInsertWords(assignment...)
+						if err != nil {
+							errMu.Lock()
+							errSlice = append(errSlice, err)
+							errWords = append(errWords, eWords...)
+							errMu.Unlock()
+						}
+						mu.Lock()
+						for w, wd := range portion {
+							res[w] = wd
+						}
+						mu.Unlock()
+						assignment = make([]string, 0)
+					}
+				}
+				if len(assignment) > 0 {
+					portion, err, eWords := QueryLLMAndInsertWords(assignment...)
+					if err != nil {
+						errMu.Lock()
+						errSlice = append(errSlice, err)
+						errWords = append(errWords, eWords...)
+						errMu.Unlock()
+					}
+					mu.Lock()
+					for w, wd := range portion {
+						res[w] = wd
+					}
+					mu.Unlock()
+				}
+			}()
+		}
+		for _, word := range words {
+			wordsChan <- word
+		}
+		close(wordsChan)
+		wg.Wait()
+	}
+
+	if len(errSlice) > 0 {
+		for _, err := range errSlice {
 			log.Println(err)
 		}
 		return nil, errors.New("scaleUpWords error"), errWords
@@ -345,5 +424,102 @@ func checkSyncLog() error {
 			}
 		}
 	}
-	return nil
+	return syncMissingFromLogs()
 }
+
+
+
+
+// scale up words source pool
+// func scaleUpWords(count int, goroutineCount int) (map[string]*wordDesc, error, []string) {
+// 	errWords := make([]string,0)
+
+// 	if err := checkSyncLog(); err != nil {
+// 		return nil, errors.New("sync log is not empty, please sync first"), errWords
+// 	}
+// 	file, err := os.OpenFile(os.Getenv("WORD_SOURCE_FILE"), os.O_RDONLY, 0644)
+// 	if err != nil {
+// 		log.Println("open file error:", err)
+// 		return nil, err, errWords
+// 	}
+// 	defer file.Close()
+// 	scanner := bufio.NewScanner(file)
+// 	if err := scanner.Err(); err != nil {
+// 		log.Println("scanner error:", err)
+// 		return nil, err, errWords
+// 	}	
+// 	res := make(map[string]*wordDesc)
+// 	wordsChan := make(chan string, count)
+// 	var wg sync.WaitGroup
+// 	var mu sync.Mutex
+// 	if goroutineCount > 10{
+// 		goroutineCount = 10
+// 	}
+// 	errSlice := make([]error,0)
+// 	var errMu sync.Mutex
+// 	for i:=0;i<goroutineCount;i++{
+// 		wg.Add(1)
+// 		go func(){
+// 			defer wg.Done()
+// 			assignment := make([]string,0)
+// 			for word := range wordsChan{
+// 				assignment = append(assignment, word)
+// 				if len(assignment) == 10{
+// 					portion, err,eWords := QueryWords(assignment...)
+// 					if err != nil{
+// 						errMu.Lock()
+// 						errSlice = append(errSlice, err)
+// 						if len(eWords) > 0{
+// 							errWords = append(errWords, eWords...)
+// 						}
+// 						errMu.Unlock()
+// 						return
+// 					}
+// 					mu.Lock()
+// 					for word, word_desc := range portion{
+// 						res[word] = word_desc
+// 					}
+// 					mu.Unlock()
+// 					assignment = make([]string,0)
+// 				}
+// 			}
+// 			if len(assignment) > 0{
+// 				portion, err,eWords := QueryWords(assignment...)
+// 				if err != nil{
+// 					errMu.Lock()
+// 					errSlice = append(errSlice, err)
+// 					if len(eWords) > 0{
+// 						errWords = append(errWords, eWords...)
+// 					}
+// 					errMu.Unlock()
+// 					return
+// 				}
+// 				mu.Lock()	
+// 				for word, word_desc := range portion{
+// 					res[word] = word_desc
+// 				}
+// 				mu.Unlock()
+// 			}
+// 		}()
+// 	}
+// 	for count != 0 {
+// 		if scanner.Scan() == false{
+// 			break
+// 		}
+// 		word := scanner.Text()
+// 		if _, err := redisClient.HGetWord(word);err == nil{
+// 			continue
+// 		}
+// 		wordsChan<- word
+// 		count--
+// 	}
+// 	close(wordsChan)
+// 	wg.Wait()
+// 	if len(errSlice) > 0{
+// 		for _, err := range errSlice{
+// 			log.Println(err)
+// 		}
+// 		return nil, errors.New("scaleUpWords error"), errWords
+// 	}
+// 	return res, nil, errWords
+// }

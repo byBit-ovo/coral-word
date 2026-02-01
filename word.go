@@ -3,7 +3,7 @@ package main
 import (
 	_ "encoding/json"
 	"fmt"
-	"log"
+	"slices"
 	"sort"
 	"strings"
 
@@ -33,7 +33,7 @@ type wordDesc struct {
 	Synonyms      []string     `json:"synonyms"`
 	Source        int
 	WordID        int64
-	SelectedNotes map[string]string 
+	SelectedNotes map[string]string
 }
 
 const (
@@ -175,6 +175,7 @@ func TagsFromMask(mask int64) []string {
 	if mask&TagPostgrad != 0 {
 		tags = append(tags, "考研")
 	}
+
 	return tags
 }
 
@@ -193,44 +194,50 @@ func QueryWords(word ...string) (map[string]*wordDesc, error, []string) {
 	if len(wordsInMysql) > 0 {
 		res, err = selectWordsByNames(wordsInMysql...)
 		if err != nil {
-			return nil, err, nil
+			return nil, err, wordsToQuery
 		}
 	}
-	errWords := make([]string, 0)
-	//query from llm
+
 	if len(wordsToQuery) > 0 {
 		for _, w := range wordsToQuery {
-			wd, err := GetWordDesc(w)
+			wordsMapInES, err := esClient.SearchWordDescFuzzy(w, 5)
 			if err != nil {
-				errWords = append(errWords, w)
-				continue
+				return nil, err, wordsToQuery
 			}
-			res[w] = wd
-			//insert into database
-			err = insertWords(wd)
-			if err != nil {
-				log.Fatal("insertWord error:", err)
-			}
-			//insert into es
-			err = esClient.IndexWordDesc(wd)
-			if err != nil {
-				log.Fatal("esClient.IndexWordDesc error:", err)
-			}
-			//insert into redis
-			if err = redisClient.HSetWord(w, wd.WordID); err != nil {
-				log.Fatal("redisWordClient.HSetWord error:", err)
+			for word, wd := range wordsMapInES {
+				res[word] = wd
+				// delete words searched in ES
+				wordsToQuery = slices.DeleteFunc(wordsToQuery, func(w string) bool {
+					return w == word
+				})
 			}
 
 		}
-		log.Println("Total word count from llm:", len(wordsToQuery)-len(errWords))
-		return res, err, errWords
 	}
-	return res, nil, errWords
+
+	if len(wordsToQuery) > 0 {
+		fmt.Println("Querying from AI... ")
+		toQuery := make([]string, len(wordsToQuery))
+		copy(toQuery, wordsToQuery)
+		go func() {
+			newWords, asyncErr, asyncErrWords := scaleUpWords(LLMPool, toQuery...)
+			if asyncErr == nil {
+				fmt.Println(len(newWords), "个单词查询成功并已入库，可再次查询获取,新单词列表:")
+				for k := range newWords {
+					fmt.Print(k + " ")
+				}
+			}
+			if len(asyncErrWords) > 0 {
+				fmt.Println(len(asyncErrWords), "个单词查询失败:")
+				fmt.Println(asyncErrWords)
+			}
+		}()
+	}
+	return res, nil, wordsToQuery
 }
 
 func (word *wordDesc) show() {
-	fmt.Println("Source: ", llm.ModelsName[word.Source])
-	fmt.Println(word.Word, word.Pronunciation)
+	fmt.Println(word.Word, " 发音: ", word.Pronunciation)
 	fmt.Print("TAG: ")
 	for _, tag := range word.Exam_tags {
 		fmt.Print(tag + " ")
@@ -251,14 +258,15 @@ func (word *wordDesc) show() {
 	fmt.Println("E.G.", word.Example)
 	fmt.Println("翻译: ", word.Example_cn)
 	for _, phrase := range word.Phrases {
-		fmt.Println(phrase.Example + " " + phrase.Example_cn)
+		fmt.Println(phrase.Example + " " + "(" + phrase.Example_cn + ")")
 	}
 	fmt.Println("同义词: ", word.Synonyms)
-	fmt.Println("精选用户笔记:***************************************************")
+	fmt.Println("精选用户笔记:-------------------------------------------------------- ")
 	for userName, note := range word.SelectedNotes {
 		fmt.Println("用户: ", userName)
 		fmt.Println("笔记: ", note)
 	}
+	fmt.Println("Source: ", llm.ModelsName[word.Source])
 	fmt.Println("-------------------------------------------------------------")
 }
 
@@ -267,13 +275,12 @@ func (word *wordDesc) showExample() {
 	fmt.Println(word.Example_cn)
 }
 
-
 func eliminateWords(words []string) error {
 	err := deleteWordsFromMysql(words...)
 	if err != nil {
 		return err
 	}
-	for _, w := range words{
+	for _, w := range words {
 		err = esClient.DeleteWordByName(w)
 		if err != nil {
 			return err
