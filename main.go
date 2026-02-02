@@ -15,12 +15,8 @@ import (
 	_ "time"
 
 	"bufio"
-	"github.com/byBit-ovo/coral_word/llm"
-	_ "github.com/gin-gonic/gin"
-	_ "github.com/go-sql-driver/mysql"
-	_ "github.com/google/uuid"
+	"github.com/byBit-ovo/coral_word/LLM"
 	"github.com/joho/godotenv"
-	_ "strings"
 )
 
 func init() {
@@ -59,8 +55,6 @@ func f2() {
 	x = 20
 }
 func test() {
-	LLMPool = NewPool(10, 200)
-	defer LLMPool.Shutdown()
 
 	words := []string{"revoke", "impose", "virtually", "profound"}
 	word_descs, err, errWords := QueryWords(words...)
@@ -73,14 +67,7 @@ func test() {
 	}
 	time.Sleep(10 * time.Hour)
 }
-
-// LLMPool 全局协程池，用于查询 LLM 补全单词（用户查词时复用，避免每次起新 goroutine）
-var LLMPool *GoRoutinePool
-
-func main() {
-	LLMPool = NewPool(10, 200)
-	defer LLMPool.Shutdown()
-
+func offLineMode(){
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("珊瑚英语单词查询系统,输入单词查询:")
 	for scanner.Scan() {
@@ -98,4 +85,12 @@ func main() {
 			word_desc.show()
 		}
 	}
+}
+// LLMPool 全局协程池，用于查询 LLM 补全单词（用户查词时复用，避免每次起新 goroutine）
+var LLMPool *GoRoutinePool
+
+func main() {
+	LLMPool = NewPool(10, 200)
+	defer LLMPool.Shutdown()
+	RunHTTPServer(os.Getenv("HTTP_ADDR"))
 }

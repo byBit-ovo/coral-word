@@ -234,7 +234,7 @@ func scaleUpWords(pool *GoRoutinePool, words ...string) (map[string]*wordDesc, e
 					res[word] = wd
 				}
 				mu.Unlock()
-				if err != nil {
+				if err != nil || len(eWords) > 0 {
 					errMu.Lock()
 					errSlice = append(errSlice, err)
 					errWords = append(errWords, eWords...)
@@ -261,7 +261,7 @@ func scaleUpWords(pool *GoRoutinePool, words ...string) (map[string]*wordDesc, e
 					assignment = append(assignment, word)
 					if len(assignment) == 10 {
 						portion, err, eWords := QueryLLMAndInsertWords(assignment...)
-						if err != nil {
+						if err != nil || len(eWords) > 0 {
 							errMu.Lock()
 							errSlice = append(errSlice, err)
 							errWords = append(errWords, eWords...)
@@ -277,7 +277,7 @@ func scaleUpWords(pool *GoRoutinePool, words ...string) (map[string]*wordDesc, e
 				}
 				if len(assignment) > 0 {
 					portion, err, eWords := QueryLLMAndInsertWords(assignment...)
-					if err != nil {
+					if err != nil || len(eWords) > 0 {
 						errMu.Lock()
 						errSlice = append(errSlice, err)
 						errWords = append(errWords, eWords...)

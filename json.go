@@ -7,7 +7,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/byBit-ovo/coral_word/llm"
+	"github.com/byBit-ovo/coral_word/LLM"
 	_ "github.com/ydb-platform/ydb-go-sdk/v3/log"
 )
 func processJson(jsonRsp string) string {

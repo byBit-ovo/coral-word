@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
+	_ "log"
 	"github.com/google/uuid"
 	_ "github.com/pingcap/log"
 	_ "github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -17,9 +17,8 @@ type User struct {
 	SessionId string
 }
 
-// if word not in database, query from llm and insert into database
 func (user *User) CreateWordNote(wordName string, note string) error {
-	word_desc, err,_ := QueryWords(wordName)
+	word_desc, err := selectWordsByNames(wordName)
 	if err != nil {
 		return err
 	}
@@ -35,7 +34,7 @@ func (user *User) CreateWordNote(wordName string, note string) error {
 
 // test over
 func (user *User) UpdateWordNote(wordName string, note string) error {
-	word_desc, err,_ := QueryWords(wordName)
+	word_desc, err := selectWordsByNames(wordName)
 	if err != nil {
 		return err
 	}
@@ -64,39 +63,40 @@ func (user *User) DeleteWordNote(wordName string) error {
 
 // test over
 func (user *User) GetWordNote(wordName string) (*WordNote, error) {
-	word_desc, err,_ := QueryWords(wordName)
-	if err != nil {
-		log.Println("QueryWords error:", err)
-		return nil, err
+	query := "select v.id, v.word, wn.note, wn.selected from vocabulary v join word_note wn on v.id = wn.word_id and wn.user_id = ? and v.word = ?"
+	row := db.QueryRow(query, user.Id, wordName)
+	var word_id int64
+	var word_name, note string
+	var selected bool
+	if err := row.Scan(&word_id, &word_name, &note, &selected); err != nil {
+		return nil, fmt.Errorf("GetWordNote error: %w", err)
 	}
-	wordNote := WordNote{
-		WordID: word_desc[wordName].WordID,
+	return &WordNote{
+		WordName: word_name,
+		UserName: user.Name,
+		WordID: word_id,
 		UserID: user.Id,
-	}
-	// fmt.Println(wordNote.WordID, wordNote.UserID)
-	err = wordNote.GetWordNote()
-	if err != nil {
-		log.Println("GetWordNote error:", err)
-		return nil, err
-	}
-	return &wordNote, nil
+		Note: note,
+		Selected: selected,
+	}, nil
 }
-func (user *User) GetAllWordNotes() ([]WordNote, error) {
-	wordNotes := []WordNote{}
-	rows, err := db.Query("select word_id, note, selected from word_note where user_id = ?", user.Id)
+func (user *User) GetAllWordNotes() ([]*WordNote, error) {
+	wordNotes := make([]*WordNote, 0)
+	query := "select v.id, v.word, wn.note, wn.selected from vocabulary v join word_note wn on v.id = wn.word_id and wn.user_id = ?"
+	rows, err := db.Query(query, user.Id)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-
 	for rows.Next() {
 		var word_id int64
-		var note string
+		var word_name, note string
 		var selected bool
-		if err := rows.Scan(&word_id,&note, &selected); err != nil {
+		if err := rows.Scan(&word_id,&word_name,&note, &selected); err != nil {
 			return nil, err
 		}
-		wordNotes = append(wordNotes, WordNote{
+		wordNotes = append(wordNotes, &WordNote{
+			UserName: user.Name,
 			WordID: word_id,
 			UserID: user.Id,
 			Note: note,
@@ -120,19 +120,19 @@ func (user *User) AppendWordNote(wordName string, note string) error {
 
 // function for administrator to set selected word note
 // test over
-func (user *User) SetSelectedWordNote(wordName string, selected bool) error {
-	// get word_id from database
-	word_desc, err,_ := QueryWords(wordName)
-	if err != nil {
-		return err
-	}
-	wordNote := WordNote{
-		WordID:   word_desc[wordName].WordID,
-		UserID:   user.Id,
-		Selected: selected,
-	}
-	return wordNote.SetSelectedWordNote(selected)
-}
+// func (user *User) SetSelectedWordNote(wordName string, selected bool) error {
+// 	// get word_id from database
+// 	word_desc, err,_ := QueryWords(wordName)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	wordNote := WordNote{
+// 		WordID:   word_desc[wordName].WordID,
+// 		UserID:   user.Id,
+// 		Selected: selected,
+// 	}
+// 	return wordNote.SetSelectedWordNote(selected)
+// }
 
 func (user *User) GetSelectedWordNotes(wordName string) ([]WordNote, error) {
 

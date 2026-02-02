@@ -6,8 +6,9 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 
-	"github.com/byBit-ovo/coral_word/llm"
+	llm "github.com/byBit-ovo/coral_word/LLM"
 )
 
 type Definition struct {
@@ -214,12 +215,15 @@ func QueryWords(word ...string) (map[string]*wordDesc, error, []string) {
 
 		}
 	}
-
+	errWord := make([]string, 0)
 	if len(wordsToQuery) > 0 {
 		fmt.Println("Querying from AI... ")
 		toQuery := make([]string, len(wordsToQuery))
 		copy(toQuery, wordsToQuery)
+		var wg sync.WaitGroup
+		wg.Add(1)
 		go func() {
+			defer wg.Done()
 			newWords, asyncErr, asyncErrWords := scaleUpWords(LLMPool, toQuery...)
 			if asyncErr == nil {
 				fmt.Println(len(newWords), "个单词查询成功并已入库，可再次查询获取,新单词列表:")
@@ -229,11 +233,12 @@ func QueryWords(word ...string) (map[string]*wordDesc, error, []string) {
 			}
 			if len(asyncErrWords) > 0 {
 				fmt.Println(len(asyncErrWords), "个单词查询失败:")
-				fmt.Println(asyncErrWords)
+				errWord = asyncErrWords
 			}
 		}()
+		wg.Wait()
 	}
-	return res, nil, wordsToQuery
+	return res, nil, errWord
 }
 
 func (word *wordDesc) show() {

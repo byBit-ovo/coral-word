@@ -3,9 +3,11 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 )
 
 type WordNote struct {
+	WordName string
 	WordID   int64
 	UserID   string
 	UserName string
@@ -13,6 +15,17 @@ type WordNote struct {
 	Selected bool
 }
 
+func (wn *WordNote) show() {
+	fmt.Println("UserName: ", wn.UserName)
+	fmt.Println("Note: ", wn.Note)
+	switch wn.Selected {
+	case true:
+		fmt.Println("Selected: √")
+	case false:
+		fmt.Println("Selected: ×")
+	}
+	fmt.Println("--------------------------------")
+}
 func (wn *WordNote) CreateWordNote() error {
 	if wn.UserID == ""{
 		return errors.New("user_id is empty")

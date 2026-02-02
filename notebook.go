@@ -6,9 +6,13 @@ import (
 	"github.com/google/uuid"
 )
 
-func createNoteBook(session string, bookName string) (err error) {
+func CreateNoteBook(session string, bookName string) (err error) {
 	uid, err := redisClient.GetUserSession(session)
-	
+	bookId, err := redisClient.GetUserBookId(uid, bookName)
+	if err != nil {
+		return err
+	}
+	redisClient.SetUserBook(uid, bookName, bookId)
 	if err != nil {
 		return fmt.Errorf("user isn't logged in !")
 	}
