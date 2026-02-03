@@ -93,9 +93,9 @@ func StartReview(sid string, bookName string) map[string]bool {
 	}
 	return words
 }
-func GetReview(uid, bookID string, limit int) (*ReviewSession, error) {
+func GetReview(uid, bookName string, limit int) (*ReviewSession, error) {
 	// 1. 获取需要复习的记录 (包含算法属性 + 单词详情)
-	stats, err := fetchReviewStats(uid, bookID, limit)
+	stats, err := fetchReviewStats(uid, bookName, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,7 @@ func GetReview(uid, bookID string, limit int) (*ReviewSession, error) {
 
 	return &ReviewSession{
 		UserId:      uid,
-		BookID:      bookID,
+		BookName:    bookName,
 		ReviewQueue: queue,
 		CurrentIdx:  0,
 	}, nil
@@ -200,21 +200,23 @@ func generateQueue(stats []*ReviewItem) []*ReviewItem {
 }
 
 // DB 操作简化
-func fetchReviewStats(uid, bookID string, limit int) ([]*ReviewItem, error) {
+func fetchReviewStats(uid, bookName string, limit int) ([]*ReviewItem, error) {
 	// JOIN 查询：一次性拿出 复习进度 + 单词基本信息
 	// 优先复习到期的(next <= now)，其次是新词(next_review_time IS NULL 或 total_reviews=0)
-	query := `SELECT 
+	query := 
+	`SELECT 
 		lr.word_id, lr.familiarity, lr.consecutive_correct, lr.next_review_time
 	FROM learning_record lr
 	JOIN vocabulary v ON lr.word_id = v.id
-	WHERE lr.user_id = ? AND lr.book_id = ? 
-		AND (lr.next_review_time <= NOW() OR lr.next_review_time IS NULL)
+	WHERE lr.user_id = ? AND lr.book_name = ? 
+		AND lr.next_review_time <= NOW() 
 	ORDER BY lr.familiarity ASC, lr.next_review_time ASC
 	LIMIT ?
 `
 	// 调试：打印查询参数
 	// fmt.Printf("DEBUG fetchReviewStats: uid=%s, bookID=%s, limit=%d\n", uid, bookID, limit)
-	rows, err := db.Query(query, uid, bookID, limit)
+
+	rows, err := db.Query(query, uid, bookName, limit)
 	if err != nil {
 		return nil, errors.New("query learning_record and vocabulary error " + err.Error())
 	}
@@ -245,6 +247,7 @@ func fetchReviewStats(uid, bookID string, limit int) ([]*ReviewItem, error) {
 		return nil, err
 	}
 	for _, item := range list {
+		fmt.Println(wordMap[item.Stat.WordID])
 		wordDesc, ok := wordMap[item.Stat.WordID]
 		if !ok {
 			return nil, fmt.Errorf("word not found for id: %d", item.Stat.WordID)

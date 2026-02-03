@@ -8,13 +8,13 @@ import (
 
 func CreateNoteBook(session string, bookName string) (err error) {
 	uid, err := redisClient.GetUserSession(session)
-	bookId, err := redisClient.GetUserBookId(uid, bookName)
-	if err != nil {
-		return err
-	}
-	redisClient.SetUserBook(uid, bookName, bookId)
 	if err != nil {
 		return fmt.Errorf("user isn't logged in !")
+	}
+	book_id := uuid.New().String()
+	err = redisClient.SetUserBook(uid, bookName, book_id)
+	if err != nil {
+		return err
 	}
 	tx, err := db.Begin()
 	if err != nil {
@@ -25,7 +25,6 @@ func CreateNoteBook(session string, bookName string) (err error) {
 			_ = tx.Rollback()
 		}
 	}()
-	book_id := uuid.New().String()
 	_, err = tx.Exec("insert into note_book (book_id, book_name, user_id) values (?,?,?)", book_id, bookName, uid)
 	if err != nil {
 		return fmt.Errorf("failed to insert notebook: %w", err)
@@ -58,8 +57,8 @@ func AddWordToNotebook(session, word, noteBookName string) (err error) {
 		return err
 	}
 
-	insertQuery := `insert into learning_record (word_id, book_id, user_id, last_review_time,next_review_time ) values (?,?,?,now(),now())`
-	_, err = tx.Exec(insertQuery, wordId, bookId, uid)
+	insertQuery := `insert into learning_record (word_id, book_name, user_id, last_review_time,next_review_time ) values (?,?,?,now(),now())`
+	_, err = tx.Exec(insertQuery, wordId, noteBookName, uid)
 	if err != nil {
 		return err
 	}

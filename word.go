@@ -6,7 +6,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
-	"sync"
+	_"sync"
 
 	llm "github.com/byBit-ovo/coral_word/LLM"
 )
@@ -32,9 +32,9 @@ type wordDesc struct {
 	Example_cn    string       `json:"example_cn"`
 	Phrases       []Phrase     `json:"phrases"`
 	Synonyms      []string     `json:"synonyms"`
-	Source        int
+	LLMModelName  string       `json:"llm_model_name"`
 	WordID        int64
-	SelectedNotes map[string]string
+	SelectedNotes map[string]string `json:"selected_notes"`
 }
 
 const (
@@ -52,7 +52,7 @@ func insertWords(words ...*wordDesc) (err error) {
 	vocs := make([]interface{}, 0, 4*len(words))
 	placeholderGroups := make([]string, len(words))
 	for i, w := range words {
-		vocs = append(vocs, w.Word, w.Pronunciation, aggregateTags(w.Exam_tags), w.Source)
+		vocs = append(vocs, w.Word, w.Pronunciation, aggregateTags(w.Exam_tags), llm.GetModelID(w.LLMModelName))
 		placeholderGroups[i] = "(?, ?, ?, ?)"
 	}
 
@@ -198,10 +198,9 @@ func QueryWords(word ...string) (map[string]*wordDesc, error, []string) {
 			return nil, err, wordsToQuery
 		}
 	}
-
 	if len(wordsToQuery) > 0 {
 		for _, w := range wordsToQuery {
-			wordsMapInES, err := esClient.SearchWordDescFuzzy(w, 5)
+			wordsMapInES, err := esClient.SearchWordDescFuzzy(w,10)
 			if err != nil {
 				return nil, err, wordsToQuery
 			}
@@ -215,30 +214,32 @@ func QueryWords(word ...string) (map[string]*wordDesc, error, []string) {
 
 		}
 	}
-	errWord := make([]string, 0)
-	if len(wordsToQuery) > 0 {
-		fmt.Println("Querying from AI... ")
-		toQuery := make([]string, len(wordsToQuery))
-		copy(toQuery, wordsToQuery)
-		var wg sync.WaitGroup
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			newWords, asyncErr, asyncErrWords := scaleUpWords(LLMPool, toQuery...)
-			if asyncErr == nil {
-				fmt.Println(len(newWords), "个单词查询成功并已入库，可再次查询获取,新单词列表:")
-				for k := range newWords {
-					fmt.Print(k + " ")
-				}
-			}
-			if len(asyncErrWords) > 0 {
-				fmt.Println(len(asyncErrWords), "个单词查询失败:")
-				errWord = asyncErrWords
-			}
-		}()
-		wg.Wait()
-	}
-	return res, nil, errWord
+	// 一般在这里要剔除掉wordsToQuery中不合法的单词，防止滥用大模型API
+	pushWordsQueryTaskToPool(LLMPool, wordsToQuery...)
+	// errWords := make([]string, 0)
+	// if len(wordsToQuery) > 0 {
+	// 	fmt.Println("Querying from AI... ")
+	// 	// toQuery := make([]string, len(wordsToQuery))
+	// 	// copy(toQuery, wordsToQuery)
+	// 	// var wg sync.WaitGroup
+	// 	// wg.Add(1)
+	// 	go func() {
+	// 		// defer wg.Done()
+	// 		newWords, asyncErr, asyncErrWords := scaleUpWords(LLMPool, wordsToQuery...)
+	// 		if asyncErr == nil {
+	// 			fmt.Println(len(newWords), "个单词查询成功并已入库，可再次查询获取,新单词列表:")
+	// 			for k := range newWords {
+	// 				fmt.Print(k + " ")
+	// 			}
+	// 		}
+	// 		if len(asyncErrWords) > 0 {
+	// 			fmt.Println(len(asyncErrWords), "个单词查询失败:")
+	// 			errWords = asyncErrWords
+	// 		}
+	// 	}()
+	// 	// wg.Wait()
+	// }
+	return res, nil, wordsToQuery
 }
 
 func (word *wordDesc) show() {
@@ -271,7 +272,7 @@ func (word *wordDesc) show() {
 		fmt.Println("用户: ", userName)
 		fmt.Println("笔记: ", note)
 	}
-	fmt.Println("Source: ", llm.ModelsName[word.Source])
+	fmt.Println("LLM Model: ", word.LLMModelName)
 	fmt.Println("-------------------------------------------------------------")
 }
 

@@ -10,13 +10,16 @@ import (
 	"log"
 	_ "net/http"
 	"os"
+	_"strconv"
 	_ "strconv"
 	"time"
 	_ "time"
 
 	"bufio"
+
 	"github.com/byBit-ovo/coral_word/LLM"
 	"github.com/joho/godotenv"
+	_"golang.org/x/sync/singleflight"
 )
 
 func init() {
@@ -39,6 +42,7 @@ func init() {
 		log.Fatal("Init Es error")
 	}
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	LLMPool = NewPool(10, 200)
 
 }
 
@@ -89,8 +93,23 @@ func offLineMode(){
 // LLMPool 全局协程池，用于查询 LLM 补全单词（用户查词时复用，避免每次起新 goroutine）
 var LLMPool *GoRoutinePool
 
+func testSf(num *int64)error{
+	*num = *num + 1
+	return nil
+}
+
 func main() {
-	LLMPool = NewPool(10, 200)
+	//"64a3a609-85d3-44ff-8f41-4efcd7a4a975"
 	defer LLMPool.Shutdown()
-	RunHTTPServer(os.Getenv("HTTP_ADDR"))
+	// RunHTTPServer(os.Getenv("HTTP_ADDR"))
+	reviewSession, err := GetReview("64a3a609-85d3-44ff-8f41-4efcd7a4a975","我的生词本",10)
+	if err != nil {
+		log.Println("GetReview error:", err)
+		return
+	}
+	for reviewSession.GetNext() != nil {
+		fmt.Println(reviewSession.GetNext().WordDesc.Word)
+	}
+
+
 }

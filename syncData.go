@@ -10,7 +10,12 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"golang.org/x/sync/singleflight"
 )
+
+// wordQueryGroup 同一单词并发请求只调一次 LLM，其余请求等待并共享结果
+var wordQueryGroup singleflight.Group
 
 // mysql, elasticsearch, redis
 
@@ -135,16 +140,13 @@ func parseMissingLogLine(line string) (int64, string, error) {
 	return id, wordStr, nil
 }
 
-
-
 func scaleFromGoogle100000(count int) (map[string]*wordDesc, error, []string) {
 	words, err := readFromGoogle100000(count)
 	if err != nil {
 		return nil, err, nil
 	}
-	return scaleUpWords(LLMPool, words...)	
-}	
-
+	return scaleUpWords(LLMPool, words...)
+}
 
 func readFromGoogle100000(count int) ([]string, error) {
 	file, err := os.OpenFile(os.Getenv("WORD_SOURCE_FILE"), os.O_RDONLY, 0644)
@@ -157,11 +159,11 @@ func readFromGoogle100000(count int) ([]string, error) {
 	if err := scanner.Err(); err != nil {
 		log.Println("scanner error:", err)
 		return nil, err
-	}	
-	words := make([]string,0)
-	for scanner.Scan() && count != 0{
+	}
+	words := make([]string, 0)
+	for scanner.Scan() && count != 0 {
 		word := scanner.Text()
-		if _, err := redisClient.HGetWord(word);err == nil{
+		if _, err := redisClient.HGetWord(word); err == nil {
 			continue
 		}
 		words = append(words, word)
@@ -170,36 +172,84 @@ func readFromGoogle100000(count int) ([]string, error) {
 	return words, nil
 }
 
-func QueryLLMAndInsertWords(words ...string) (map[string]*wordDesc, error, []string){
-	errWords := make([]string,0)
+// 批量查询并插入数据库
+func QueryLLMAndInsertWords(words ...string) (map[string]*wordDesc, error, []string) {
+	errWords := make([]string, 0)
 	res := make(map[string]*wordDesc)
 	wordDescs, err := GetWordDescFromLLM(words...)
-	if err != nil{
+	if err != nil {
 		return nil, err, errWords
 	}
-	for word, wordDesc := range wordDescs{
-		if wordDesc.Err == "true"{
+	for word, wordDesc := range wordDescs {
+		if wordDesc.Err == "true" {
 			errWords = append(errWords, word)
 			continue
 		}
 		err = insertWords(wordDesc)
-		if err != nil{
+		if err != nil {
 			log.Println("insertWords error:", err)
 			continue
 		}
 		err = esClient.IndexWordDesc(wordDesc)
-		if err != nil{
+		if err != nil {
 			log.Println("esClient.IndexWordDesc error:", err)
 			continue
 		}
 		err = redisClient.HSetWord(word, wordDesc.WordID)
-		if err != nil{
+		if err != nil {
 			log.Println("redisClient.HSetWord error:", err)
 			continue
 		}
 		res[word] = wordDesc
-	}	
+	}
 	return res, nil, errWords
+}
+
+// Non block
+func pushWordsQueryTaskToPool(pool *GoRoutinePool, words ...string) error {
+
+	filteredWords := make([]string, 0)
+	for _, word := range words {
+		if ok, err := redisClient.IsQueryingWord(word); err != nil {
+			log.Println("redisClient.IsQueryingWord error:", err)
+			return err
+		}else if ok == true {
+			continue
+		}
+		filteredWords = append(filteredWords, word)
+	}
+	if len(filteredWords) == 0 {
+		return nil
+	}
+	log.Println("Words pushed to Query :", filteredWords)
+	const batchSize = 10
+	for i := 0; i < len(filteredWords); i += batchSize {
+		end := i + batchSize
+		if end > len(filteredWords) {
+			end = len(filteredWords)
+		}
+		if err := redisClient.SetQueryingWord(filteredWords[i:end]...); err != nil {
+			log.Println("redisClient.SetQueryingWord error:", err)
+			return err
+		}
+		batch := filteredWords[i:end]
+		pool.Submit(func(ctx context.Context) {
+			defer redisClient.DelQueryingWord(batch...)
+			newWords, err, errWords := QueryLLMAndInsertWords(batch...)
+			if err != nil {
+				log.Println("QueryLLMAndInsertWords error:", err)
+				return
+			}
+			if len(errWords) > 0 {
+				log.Println("查询大模型失败的单词:",errWords)
+			}
+			log.Println(len(newWords), "个单词查询成功并已入库，可再次查询获取,新单词列表:")
+			for k := range newWords {
+				log.Print(k + " ")
+			}
+		})
+	}
+	return nil
 }
 
 // scaleUpWords 用 LLM 补全单词：pool 非空时用协程池执行，否则起临时 goroutine。
@@ -426,4 +476,3 @@ func checkSyncLog() error {
 	}
 	return syncMissingFromLogs()
 }
-

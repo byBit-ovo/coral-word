@@ -9,7 +9,7 @@ import (
 	_ "sort"
 	_ "strconv"
 	"strings"
-
+	llm "github.com/byBit-ovo/coral_word/LLM"
 	"time"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/google/uuid"
@@ -105,9 +105,11 @@ func selectWordsByIds(wordIds ...int64) (map[int64]*wordDesc, error) {
 	for rows.Next() {
 		w := &wordDesc{}
 		var tag int64
-		if err := rows.Scan(&w.WordID, &w.Word, &w.Pronunciation, &tag, &w.Source); err != nil {
+		var source int
+		if err := rows.Scan(&w.WordID, &w.Word, &w.Pronunciation, &tag, &source); err != nil {
 			return nil, err
 		}
+		w.LLMModelName = llm.ModelsName[source]
 		wordsByID[w.WordID] = w
 		w.Exam_tags = TagsFromMask(tag)
 	}
@@ -153,10 +155,12 @@ func selectWordsByNames(words ...string) (map[string]*wordDesc, error) {
 	for rows.Next() {
 		w := &wordDesc{}
 		var tag int64
-		if err := rows.Scan(&w.WordID, &w.Word, &w.Pronunciation, &tag, &w.Source); err != nil {
+		var source int
+		if err := rows.Scan(&w.WordID, &w.Word, &w.Pronunciation, &tag, &source); err != nil {
 			return nil, err
 		}
 		wordsByName[w.Word] = w
+		w.LLMModelName = llm.ModelsName[source]
 		w.Exam_tags = TagsFromMask(tag)
 	}
 	if err := rows.Err(); err != nil {

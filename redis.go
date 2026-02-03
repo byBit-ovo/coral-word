@@ -6,6 +6,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"os"
 	"strconv"
+	"time"
 )
 
 var redisClientBase *redis.Client
@@ -89,6 +90,33 @@ func (client *RedisClient) DelUserBookId(userId, bookName string) error {
 	return client.client.HDel(context.Background(), "coral_word_user_book", key).Err()
 }
 
+func (client *RedisClient) SetQueryingWord(words ...string) error {
+	querying := "querying_"
+	for _, word := range words {
+		client.client.Set(context.Background(), querying+word, "1", 5*time.Minute)
+	}
+	return nil
+}
+
+func (client *RedisClient) IsQueryingWord(word string) (bool, error) {
+	res, err := client.client.Get(context.Background(), "querying_"+word).Result()
+	if err == redis.Nil {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return res == "1", nil
+}
+
+func (client *RedisClient) DelQueryingWord(words ...string) error {
+	for _, word := range words {
+		if err := client.client.Del(context.Background(), "querying_"+word).Err(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 
 

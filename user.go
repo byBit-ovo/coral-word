@@ -14,7 +14,7 @@ type User struct {
 	Id        string `json:"id"`
 	Name      string `json:"name"`
 	Pswd      string `json:"pswd"`
-	SessionId string
+	SessionId string `json:"session_id"`
 }
 
 func (user *User) CreateWordNote(wordName string, note string) error {
@@ -48,17 +48,15 @@ func (user *User) UpdateWordNote(wordName string, note string) error {
 
 // test over
 func (user *User) DeleteWordNote(wordName string) error {
-	word_desc, err,_ := QueryWords(wordName)
+	word_id, err := redisClient.HGetWord(wordName)
 	if err != nil {
 		return err
 	}
 	wordNote := WordNote{
-		WordID:   word_desc[wordName].WordID,
-		UserID:   user.Id,
-		Note:     "",
-		Selected: false,
+		WordID: word_id,
+		UserID: user.Id,
 	}
-	return wordNote.DeleteWordNote()
+	return wordNote.DeleteWordNote()	
 }
 
 // test over
@@ -74,8 +72,6 @@ func (user *User) GetWordNote(wordName string) (*WordNote, error) {
 	return &WordNote{
 		WordName: word_name,
 		UserName: user.Name,
-		WordID: word_id,
-		UserID: user.Id,
 		Note: note,
 		Selected: selected,
 	}, nil

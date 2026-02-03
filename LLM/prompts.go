@@ -1,13 +1,16 @@
 package llm
 
 import(
+	"slices"
 	"strings"
 )
 
 
 
 var Models = map[int]AIModel{}
-
+func GetModelID(modelName string) int {
+	return slices.Index(ModelsName, modelName)
+}
 const (
 	DEEP_SEEK = iota
 	GEMINI

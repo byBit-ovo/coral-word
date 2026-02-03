@@ -7,12 +7,12 @@ import (
 )
 
 type WordNote struct {
-	WordName string
-	WordID   int64
-	UserID   string
-	UserName string
-	Note     string
-	Selected bool
+	WordName string   `json:"word_name"`
+	WordID   int64    `json:"-"`
+	UserID   string   `json:"-"`
+	UserName string   `json:"user_name"`
+	Note     string   `json:"note"`
+	Selected bool     `json:"selected"`
 }
 
 func (wn *WordNote) show() {

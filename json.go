@@ -35,6 +35,7 @@ func processJson(jsonRsp string) string {
 
 
 
+// 批量查询
 func GetWordDescFromLLM(words ...string) (map[string]*wordDesc, error){
 	choseModel := llm.DEEP_SEEK
 	json_rsp, err := llm.Models[choseModel].GetWordDefWithJson(words...)
@@ -49,7 +50,7 @@ func GetWordDescFromLLM(words ...string) (map[string]*wordDesc, error){
 	wrapper.Words = make([]*wordDesc, len(words))
 	for i, _ := range wrapper.Words{
 		wrapper.Words[i] = &wordDesc{}
-		wrapper.Words[i].Source = choseModel
+		wrapper.Words[i].LLMModelName = llm.ModelsName[choseModel]
 		wrapper.Words[i].Word = words[i]
 	}
 	err = json.Unmarshal([]byte(json_rsp), &wrapper)
