@@ -107,8 +107,8 @@ func main() {
 		log.Println("GetReview error:", err)
 		return
 	}
-	for reviewSession.GetNext() != nil {
-		fmt.Println(reviewSession.GetNext().WordDesc.Word)
+	for _, item := range reviewSession.ReviewQueue {
+		fmt.Println(item.WordDesc.Word)
 	}
 
 
