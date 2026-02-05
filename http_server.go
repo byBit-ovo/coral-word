@@ -1,11 +1,9 @@
 package main
 
 import (
-	_ "errors"
 	"fmt"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,11 +13,6 @@ type apiResponse struct {
 	Message string      `json:"message"`
 	Data    interface{} `json:"data"` //如果字段是“空值”，就不要出现在 JSON 里。
 }
-
-var (
-	reviewSessions   = map[string]*ReviewSession{}
-	reviewSessionsMu sync.Mutex
-)
 
 func RunHTTPServer(addr string) error {
 	router := gin.Default()
@@ -238,7 +231,16 @@ func CreateNoteBookApi(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		req.BookName = c.PostForm("book_name")
 	}
-	if err := CreateNoteBook(req.SessionId, req.BookName); err != nil {
+	uid, err := redisClient.GetUserSession(req.SessionId)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, err.Error())
+		return
+	}	
+	user := &User{
+		Id:        uid,
+		SessionId: req.SessionId,
+	}
+	if err := user.CreateNoteBook(req.BookName); err != nil {
 		respondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -253,7 +255,16 @@ func AddWordToNotebookApi(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		req.Word = c.PostForm("word")
 	}
-	if err := AddWordToNotebook(req.SessionId, req.Word, req.BookName); err != nil {
+	uid, err := redisClient.GetUserSession(req.SessionId)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	user := &User{
+		Id:        uid,
+		SessionId: req.SessionId,
+	}
+	if err := user.AddWordToNotebook(req.Word, req.BookName); err != nil {
 		respondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
@@ -277,102 +288,98 @@ func ReviewStart(c *gin.Context) {
 		respondError(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	bookId, err := redisClient.GetUserBookId(uid, req.BookName)
-	if err != nil {
-		respondError(c, http.StatusBadRequest, "book not found for user")
-		return
-	}
-	session, err := GetReview(uid, bookId, 10)
+	session, err := GetReview(uid, req.BookName, 10)
 	if err != nil {
 		respondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
-	reviewSessionsMu.Lock()
-	reviewSessions[req.SessionId] = session
-	reviewSessionsMu.Unlock()
-
-	respondOK(c, session)
-}
-
-func getSessionID(c *gin.Context) (string, error) {
-	sid := strings.TrimSpace(c.GetHeader("X-Session-Id"))
-	if sid == "" {
-		sid = strings.TrimSpace(c.Query("session_id"))
-	}
-	if sid == "" {
-		return "", fmt.Errorf("session_id is empty")
-	}
-	return sid, nil
-}
-
-func getReviewSession(sessionID string) (*ReviewSession, error) {
-	reviewSessionsMu.Lock()
-	defer reviewSessionsMu.Unlock()
-	session, ok := reviewSessions[sessionID]
-	if !ok {
-		return nil, fmt.Errorf("review session not found")
-	}
-	return session, nil
-}
-
-func NextReview(c *gin.Context) {
-	sessionID, err := getSessionID(c)
-	if err != nil {
-		respondError(c, http.StatusUnauthorized, err.Error())
-		return
-	}
-	session, err := getReviewSession(sessionID)
-	if err != nil {
-		respondError(c, http.StatusUnauthorized, err.Error())
-		return
-	}
-	item := session.GetNext()
-	if item == nil {
-		respondOK(c, gin.H{"item": nil, "done": true})
+	// 存入 Redis（30 分钟过期）
+	if err := redisClient.SetReviewSession(req.SessionId, session); err != nil {
+		respondError(c, http.StatusInternalServerError, "failed to save session")
 		return
 	}
 	respondOK(c, gin.H{
-		"index": session.CurrentIdx - 1,
-		"item":  item,
+		"total": len(session.ReviewQueue),
+		"msg":   "review session started",
+	})
+}
+
+// NextReview 获取下一题（GET，session_id 在 Query 参数）
+func NextReview(c *gin.Context) {
+	// sessionID := strings.TrimSpace(c.Query("session_id"))
+	sessionID := c.GetHeader("X-Session-ID")
+	if sessionID == "" {
+		respondError(c, http.StatusBadRequest, "session_id is required")
+		return
+	}
+	session, err := redisClient.GetReviewSession(sessionID)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if session == nil {
+		respondError(c, http.StatusNotFound, "review session not found or expired")
+		return
+	}
+	item, err := session.GetNext()
+	if err != nil {
+
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	// 更新 session 到 Redis（刷新 TTL）
+	redisClient.SetReviewSession(sessionID, session)
+	respondOK(c, gin.H{
+		"next_index": session.CurrentIdx,
+		"word":  item.WordDesc.Word,
 		"done":  false,
 	})
 }
 
+// SubmitReview 提交答案（POST，session_id 在请求体）
 func SubmitReview(c *gin.Context) {
-	sessionID, err := getSessionID(c)
-	if err != nil {
-		respondError(c, http.StatusUnauthorized, err.Error())
-		return
+	var req struct {
+		SessionId string `json:"session_id"`
+		Index     int    `json:"index"`
+		Correct   bool   `json:"correct"`
 	}
-	session, err := getReviewSession(sessionID)
-	if err != nil {
-		respondError(c, http.StatusUnauthorized, err.Error())
-		return
-	}
-	var reqBody struct {
-		Index   int  `json:"index"`
-		Correct bool `json:"correct"`
-	}
-	if err := c.ShouldBindJSON(&reqBody); err != nil {
+	if err := c.ShouldBindJSON(&req); err != nil {
 		respondError(c, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if reqBody.Index < 0 || reqBody.Index >= len(session.ReviewQueue) {
+	if req.SessionId == "" {
+		respondError(c, http.StatusBadRequest, "session_id is required")
+		return
+	}
+	session, err := redisClient.GetReviewSession(req.SessionId)
+	if err != nil {
+		respondError(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	if session == nil {
+		respondError(c, http.StatusNotFound, "review session not found or expired")
+		return
+	}
+	if req.Index < 0 || req.Index >= len(session.ReviewQueue) {
 		respondError(c, http.StatusBadRequest, "invalid index")
 		return
 	}
-	item := session.ReviewQueue[reqBody.Index]
-	session.SubmitAnswer(item, reqBody.Correct)
+	item := session.ReviewQueue[req.Index]
+	session.SubmitAnswer(item, req.Correct)
 	if session.Status == REVIEW_OVER {
 		if err := session.saveProgress(); err != nil {
 			respondError(c, http.StatusInternalServerError, err.Error())
 			return
 		}
-		reviewSessionsMu.Lock()
-		delete(reviewSessions, sessionID)
-		reviewSessionsMu.Unlock()
+		// 复习结束，删除 session
+		redisClient.DelReviewSession(req.SessionId)
+		respondOK(c, gin.H{"msg": "review completed"})
+		return
 	}
-	respondOK(c, nil)
+	// 更新 session 到 Redis
+	redisClient.SetReviewSession(req.SessionId, session)
+	respondOK(c, gin.H{"next_index": session.CurrentIdx, 
+	"word": item.WordDesc, "done": false})
 }
 
 func respondOK(c *gin.Context, data interface{}) {

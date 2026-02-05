@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	_ "log"
+
+	"github.com/go-redis/redis/v8"
 	"github.com/google/uuid"
 	_ "github.com/pingcap/log"
 	_ "github.com/ydb-platform/ydb-go-sdk/v3/log"
@@ -263,10 +265,21 @@ func (user *User) userLogin() error {
 	if user.Pswd != u.Pswd {
 		return errors.New("incorrect password")
 	}
+	userName, err := redisClient.GetUserName(u.Id)
+	if err != nil && err != redis.Nil {
+		return err
+	}
+	if userName != "" {
+		return errors.New("user already logged in")
+	}
 	sessionId := uuid.New().String()
-	err = redisClient.SetUserSession(sessionId, u.Id)
 	user.SessionId = sessionId
 	user.Id = u.Id
+	err = redisClient.SetUserSession(sessionId, u.Id)
+	if err != nil {
+		return err
+	}
+	err = redisClient.SetUserName(user.Id, user.Name)
 	if err != nil {
 		return err
 	}
@@ -277,6 +290,10 @@ func (user *User) userLogout() error {
 	err := redisClient.DelUserSession(user.SessionId)
 	if err != nil {
 		return fmt.Errorf("failed to delete user session: %w", err)
+	}
+	err = redisClient.DelUserName(user.Id)
+	if err != nil {
+		return err
 	}
 	return nil
 }

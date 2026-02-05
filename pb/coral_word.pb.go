@@ -181,8 +181,9 @@ type WordDesc struct {
 	ExampleCn     string                 `protobuf:"bytes,8,opt,name=example_cn,json=exampleCn,proto3" json:"example_cn,omitempty"`
 	Phrases       []*Phrase              `protobuf:"bytes,9,rep,name=phrases,proto3" json:"phrases,omitempty"`
 	Synonyms      []string               `protobuf:"bytes,10,rep,name=synonyms,proto3" json:"synonyms,omitempty"`
-	Source        int32                  `protobuf:"varint,11,opt,name=source,proto3" json:"source,omitempty"`
+	LlmModelName  string                 `protobuf:"bytes,11,opt,name=llm_model_name,json=llmModelName,proto3" json:"llm_model_name,omitempty"`
 	WordId        int64                  `protobuf:"varint,12,opt,name=word_id,json=wordId,proto3" json:"word_id,omitempty"`
+	SelectedNotes map[string]string      `protobuf:"bytes,13,rep,name=selected_notes,json=selectedNotes,proto3" json:"selected_notes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -287,11 +288,11 @@ func (x *WordDesc) GetSynonyms() []string {
 	return nil
 }
 
-func (x *WordDesc) GetSource() int32 {
+func (x *WordDesc) GetLlmModelName() string {
 	if x != nil {
-		return x.Source
+		return x.LlmModelName
 	}
-	return 0
+	return ""
 }
 
 func (x *WordDesc) GetWordId() int64 {
@@ -299,6 +300,81 @@ func (x *WordDesc) GetWordId() int64 {
 		return x.WordId
 	}
 	return 0
+}
+
+func (x *WordDesc) GetSelectedNotes() map[string]string {
+	if x != nil {
+		return x.SelectedNotes
+	}
+	return nil
+}
+
+type WordDescList struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WordDescs     map[string]*WordDesc   `protobuf:"bytes,1,rep,name=word_descs,json=wordDescs,proto3" json:"word_descs,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	MissWords     []string               `protobuf:"bytes,2,rep,name=miss_words,json=missWords,proto3" json:"miss_words,omitempty"`
+	Err           string                 `protobuf:"bytes,3,opt,name=err,proto3" json:"err,omitempty"`
+	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WordDescList) Reset() {
+	*x = WordDescList{}
+	mi := &file_proto_coral_word_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WordDescList) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WordDescList) ProtoMessage() {}
+
+func (x *WordDescList) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coral_word_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WordDescList.ProtoReflect.Descriptor instead.
+func (*WordDescList) Descriptor() ([]byte, []int) {
+	return file_proto_coral_word_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *WordDescList) GetWordDescs() map[string]*WordDesc {
+	if x != nil {
+		return x.WordDescs
+	}
+	return nil
+}
+
+func (x *WordDescList) GetMissWords() []string {
+	if x != nil {
+		return x.MissWords
+	}
+	return nil
+}
+
+func (x *WordDescList) GetErr() string {
+	if x != nil {
+		return x.Err
+	}
+	return ""
+}
+
+func (x *WordDescList) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
 }
 
 var File_proto_coral_word_proto protoreflect.FileDescriptor
@@ -316,7 +392,7 @@ const file_proto_coral_word_proto_rawDesc = "" +
 	"\x06Phrase\x12\x18\n" +
 	"\aexample\x18\x01 \x01(\tR\aexample\x12\x1d\n" +
 	"\n" +
-	"example_cn\x18\x02 \x01(\tR\texampleCn\"\x83\x03\n" +
+	"example_cn\x18\x02 \x01(\tR\texampleCn\"\xa3\x04\n" +
 	"\bWordDesc\x12\x10\n" +
 	"\x03err\x18\x01 \x01(\tR\x03err\x12\x12\n" +
 	"\x04word\x18\x02 \x01(\tR\x04word\x12$\n" +
@@ -329,11 +405,25 @@ const file_proto_coral_word_proto_rawDesc = "" +
 	"example_cn\x18\b \x01(\tR\texampleCn\x12,\n" +
 	"\aphrases\x18\t \x03(\v2\x12.coral_word.PhraseR\aphrases\x12\x1a\n" +
 	"\bsynonyms\x18\n" +
-	" \x03(\tR\bsynonyms\x12\x16\n" +
-	"\x06source\x18\v \x01(\x05R\x06source\x12\x17\n" +
-	"\aword_id\x18\f \x01(\x03R\x06wordId2N\n" +
-	"\x10CoralWordService\x12:\n" +
-	"\tQueryWord\x12\x17.coral_word.WordRequest\x1a\x14.coral_word.WordDescB'Z%github.com/byBit-ovo/coral_word/pb;pbb\x06proto3"
+	" \x03(\tR\bsynonyms\x12$\n" +
+	"\x0ellm_model_name\x18\v \x01(\tR\fllmModelName\x12\x17\n" +
+	"\aword_id\x18\f \x01(\x03R\x06wordId\x12N\n" +
+	"\x0eselected_notes\x18\r \x03(\v2'.coral_word.WordDesc.SelectedNotesEntryR\rselectedNotes\x1a@\n" +
+	"\x12SelectedNotesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf5\x01\n" +
+	"\fWordDescList\x12F\n" +
+	"\n" +
+	"word_descs\x18\x01 \x03(\v2'.coral_word.WordDescList.WordDescsEntryR\twordDescs\x12\x1d\n" +
+	"\n" +
+	"miss_words\x18\x02 \x03(\tR\tmissWords\x12\x10\n" +
+	"\x03err\x18\x03 \x01(\tR\x03err\x12\x18\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x1aR\n" +
+	"\x0eWordDescsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12*\n" +
+	"\x05value\x18\x02 \x01(\v2\x14.coral_word.WordDescR\x05value:\x028\x012R\n" +
+	"\x10CoralWordService\x12>\n" +
+	"\tQueryWord\x12\x17.coral_word.WordRequest\x1a\x18.coral_word.WordDescListB'Z%github.com/byBit-ovo/coral_word/pb;pbb\x06proto3"
 
 var (
 	file_proto_coral_word_proto_rawDescOnce sync.Once
@@ -347,23 +437,29 @@ func file_proto_coral_word_proto_rawDescGZIP() []byte {
 	return file_proto_coral_word_proto_rawDescData
 }
 
-var file_proto_coral_word_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_proto_coral_word_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
 var file_proto_coral_word_proto_goTypes = []any{
-	(*WordRequest)(nil), // 0: coral_word.WordRequest
-	(*Definition)(nil),  // 1: coral_word.Definition
-	(*Phrase)(nil),      // 2: coral_word.Phrase
-	(*WordDesc)(nil),    // 3: coral_word.WordDesc
+	(*WordRequest)(nil),  // 0: coral_word.WordRequest
+	(*Definition)(nil),   // 1: coral_word.Definition
+	(*Phrase)(nil),       // 2: coral_word.Phrase
+	(*WordDesc)(nil),     // 3: coral_word.WordDesc
+	(*WordDescList)(nil), // 4: coral_word.WordDescList
+	nil,                  // 5: coral_word.WordDesc.SelectedNotesEntry
+	nil,                  // 6: coral_word.WordDescList.WordDescsEntry
 }
 var file_proto_coral_word_proto_depIdxs = []int32{
 	1, // 0: coral_word.WordDesc.definitions:type_name -> coral_word.Definition
 	2, // 1: coral_word.WordDesc.phrases:type_name -> coral_word.Phrase
-	0, // 2: coral_word.CoralWordService.QueryWord:input_type -> coral_word.WordRequest
-	3, // 3: coral_word.CoralWordService.QueryWord:output_type -> coral_word.WordDesc
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	5, // 2: coral_word.WordDesc.selected_notes:type_name -> coral_word.WordDesc.SelectedNotesEntry
+	6, // 3: coral_word.WordDescList.word_descs:type_name -> coral_word.WordDescList.WordDescsEntry
+	3, // 4: coral_word.WordDescList.WordDescsEntry.value:type_name -> coral_word.WordDesc
+	0, // 5: coral_word.CoralWordService.QueryWord:input_type -> coral_word.WordRequest
+	4, // 6: coral_word.CoralWordService.QueryWord:output_type -> coral_word.WordDescList
+	6, // [6:7] is the sub-list for method output_type
+	5, // [5:6] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_proto_coral_word_proto_init() }
@@ -377,7 +473,7 @@ func file_proto_coral_word_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_coral_word_proto_rawDesc), len(file_proto_coral_word_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   7,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -26,7 +26,7 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type CoralWordServiceClient interface {
-	QueryWord(ctx context.Context, in *WordRequest, opts ...grpc.CallOption) (*WordDesc, error)
+	QueryWord(ctx context.Context, in *WordRequest, opts ...grpc.CallOption) (*WordDescList, error)
 }
 
 type coralWordServiceClient struct {
@@ -37,9 +37,9 @@ func NewCoralWordServiceClient(cc grpc.ClientConnInterface) CoralWordServiceClie
 	return &coralWordServiceClient{cc}
 }
 
-func (c *coralWordServiceClient) QueryWord(ctx context.Context, in *WordRequest, opts ...grpc.CallOption) (*WordDesc, error) {
+func (c *coralWordServiceClient) QueryWord(ctx context.Context, in *WordRequest, opts ...grpc.CallOption) (*WordDescList, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(WordDesc)
+	out := new(WordDescList)
 	err := c.cc.Invoke(ctx, CoralWordService_QueryWord_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (c *coralWordServiceClient) QueryWord(ctx context.Context, in *WordRequest,
 // All implementations must embed UnimplementedCoralWordServiceServer
 // for forward compatibility.
 type CoralWordServiceServer interface {
-	QueryWord(context.Context, *WordRequest) (*WordDesc, error)
+	QueryWord(context.Context, *WordRequest) (*WordDescList, error)
 	mustEmbedUnimplementedCoralWordServiceServer()
 }
 
@@ -62,7 +62,7 @@ type CoralWordServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedCoralWordServiceServer struct{}
 
-func (UnimplementedCoralWordServiceServer) QueryWord(context.Context, *WordRequest) (*WordDesc, error) {
+func (UnimplementedCoralWordServiceServer) QueryWord(context.Context, *WordRequest) (*WordDescList, error) {
 	return nil, status.Error(codes.Unimplemented, "method QueryWord not implemented")
 }
 func (UnimplementedCoralWordServiceServer) mustEmbedUnimplementedCoralWordServiceServer() {}

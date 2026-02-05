@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"log"
-	"github.com/go-redis/redis/v8"
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/go-redis/redis/v8"
 )
 
 var redisClientBase *redis.Client
@@ -77,18 +79,18 @@ func (client *RedisClient) DelUserName(userId string) error {
 	return client.client.HDel(context.Background(), "coral_word_user", userId).Err()
 }
 
-func (client *RedisClient) SetUserBook(userId, bookName, bookId string) error {
-	key := userId + "_" + bookName
-	return client.client.HSet(context.Background(), "coral_word_user_book",key,bookId).Err()
-}
-func (client *RedisClient) GetUserBookId(userId, bookName string) (string, error) {
-	key := userId + "_" + bookName
-	return client.client.HGet(context.Background(), "coral_word_user_book",key).Result()
-}
-func (client *RedisClient) DelUserBookId(userId, bookName string) error {
-	key := userId + "_" + bookName
-	return client.client.HDel(context.Background(), "coral_word_user_book", key).Err()
-}
+// func (client *RedisClient) SetUserBook(userId, bookName, bookId string) error {
+// 	key := userId + "_" + bookName
+// 	return client.client.HSet(context.Background(), "coral_word_user_book",key,bookId).Err()
+// }
+// func (client *RedisClient) GetUserBookId(userId, bookName string) (string, error) {
+// 	key := userId + "_" + bookName
+// 	return client.client.HGet(context.Background(), "coral_word_user_book",key).Result()
+// }
+// func (client *RedisClient) DelUserBookId(userId, bookName string) error {
+// 	key := userId + "_" + bookName
+// 	return client.client.HDel(context.Background(), "coral_word_user_book", key).Err()
+// }
 
 func (client *RedisClient) SetQueryingWord(words ...string) error {
 	querying := "querying_"
@@ -116,6 +118,39 @@ func (client *RedisClient) DelQueryingWord(words ...string) error {
 		}
 	}
 	return nil
+}
+
+// ReviewSession 存储到 Redis（30 分钟过期）
+const reviewSessionTTL = 30 * time.Minute
+const reviewSessionPrefix = "review_session:"
+
+func (client *RedisClient) SetReviewSession(sessionID string, session *ReviewSession) error {
+	data, err := json.Marshal(session)
+	if err != nil {
+		return err
+	}
+	return client.client.Set(context.Background(), reviewSessionPrefix+sessionID, data, reviewSessionTTL).Err()
+}
+
+func (client *RedisClient) GetReviewSession(sessionID string) (*ReviewSession, error) {
+	key := reviewSessionPrefix + sessionID
+	log.Println("GetReviewSession", key)
+	data, err := client.client.Get(context.Background(), key).Bytes()
+	if err == redis.Nil {
+		return nil, nil // session 不存在
+	}
+	if err != nil {
+		return nil, err
+	}
+	var session ReviewSession
+	if err := json.Unmarshal(data, &session); err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
+func (client *RedisClient) DelReviewSession(sessionID string) error {
+	return client.client.Del(context.Background(), reviewSessionPrefix+sessionID).Err()
 }
 
 

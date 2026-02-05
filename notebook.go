@@ -6,16 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
-func CreateNoteBook(session string, bookName string) (err error) {
-	uid, err := redisClient.GetUserSession(session)
-	if err != nil {
-		return fmt.Errorf("user isn't logged in !")
-	}
+func (user *User)CreateNoteBook(bookName string) (err error) {
 	book_id := uuid.New().String()
-	err = redisClient.SetUserBook(uid, bookName, book_id)
-	if err != nil {
-		return err
-	}
+	// err = redisClient.SetUserBook(uid, bookName, book_id)
+	// if err != nil {
+	// 	return err
+	// }
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -25,18 +21,14 @@ func CreateNoteBook(session string, bookName string) (err error) {
 			_ = tx.Rollback()
 		}
 	}()
-	_, err = tx.Exec("insert into note_book (book_id, book_name, user_id) values (?,?,?)", book_id, bookName, uid)
+	_, err = tx.Exec("insert into note_book (book_id, book_name, user_id) values (?,?,?)", book_id, bookName, user.Id)
 	if err != nil {
 		return fmt.Errorf("failed to insert notebook: %w", err)
 	}
 	return tx.Commit()
 }
 
-func AddWordToNotebook(session, word, noteBookName string) (err error) {
-	uid, err := redisClient.GetUserSession(session)
-	if err != nil {
-		return fmt.Errorf("user isn't logged in !")
-	}
+func (user *User) AddWordToNotebook(word, noteBookName string) (err error) {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
@@ -51,14 +43,14 @@ func AddWordToNotebook(session, word, noteBookName string) (err error) {
 	if err := row.Scan(&wordId); err != nil {
 		return err
 	}
-	row = tx.QueryRow("select book_id from note_book where book_name=? and user_id=?", noteBookName, uid)
+	row = tx.QueryRow("select book_id from note_book where book_name=? and user_id=?", noteBookName, user.Id)
 	var bookId string
 	if err := row.Scan(&bookId); err != nil {
 		return err
 	}
 
 	insertQuery := `insert into learning_record (word_id, book_name, user_id, last_review_time,next_review_time ) values (?,?,?,now(),now())`
-	_, err = tx.Exec(insertQuery, wordId, noteBookName, uid)
+	_, err = tx.Exec(insertQuery, wordId, noteBookName, user.Id)
 	if err != nil {
 		return err
 	}

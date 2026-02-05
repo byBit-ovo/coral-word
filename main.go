@@ -14,7 +14,7 @@ import (
 	_ "strconv"
 	"time"
 	_ "time"
-
+	"context"
 	"bufio"
 
 	"github.com/byBit-ovo/coral_word/LLM"
@@ -98,18 +98,52 @@ func testSf(num *int64)error{
 	return nil
 }
 
+const(
+	s1 = "hello"
+)
+
 func main() {
 	//"64a3a609-85d3-44ff-8f41-4efcd7a4a975"
 	defer LLMPool.Shutdown()
-	// RunHTTPServer(os.Getenv("HTTP_ADDR"))
-	reviewSession, err := GetReview("64a3a609-85d3-44ff-8f41-4efcd7a4a975","我的生词本",10)
+	// go RunHTTPServer(os.Getenv("HTTP_ADDR"))
+	go RunGrpcServer(os.Getenv("GRPC_ADDR"))
+	grcpClient, err := NewCoralWordGrpcClient()
 	if err != nil {
-		log.Println("GetReview error:", err)
-		return
+		log.Fatalf("failed to create grpc client: %v", err)
 	}
-	for _, item := range reviewSession.ReviewQueue {
-		fmt.Println(item.WordDesc.Word)
-	}
+	for true{
+		var word string
+		fmt.Scan(&word)
+		word_descs, err := grcpClient.QueryWord(context.Background(), word)
+		if err != nil {
+			log.Fatalf("failed to query word: %v", err)
+		}
+		if word_descs.Err != "false" {
+			log.Println(word_descs.Message)
+			continue
+		} 
+		for _, word_desc := range word_descs.GetWordDescs() {
+			FromPbWordDesc(word_desc).show()
+		}
 
+	}
+	// StartReview("ab7b3f22-861f-4288-b8f5-46676bb0042a","我的生词本")
+	// RyanQi := &User{
+	// 	Name: "RyanQi",	
+	// 	Pswd: "1234567",
+	// }
+	// err := RyanQi.userLogin()
+	// if err != nil {
+	// 	log.Println("userLogin error:", err)
+	// 	return
+	// }
+	// log.Println("userLogin success")
+	// time.Sleep(10 * time.Second)
+	// err = RyanQi.userLogout()
+	// if err != nil {
+	// 	log.Println("userLogout error:", err)
+	// 	return
+	// }
+	// log.Println("userLogout success")
 
 }

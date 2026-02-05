@@ -29,10 +29,17 @@ message WordDesc {
   string example_cn = 8;
   repeated Phrase phrases = 9;
   repeated string synonyms = 10;
-  int32 source = 11;
+  string llm_model_name = 11; 
   int64 word_id = 12;
+  map<string, string> selected_notes = 13;
+}
+message WordDescList{
+  map<string, WordDesc> word_descs = 1;
+  repeated string miss_words = 2;
+  string err = 3;
+  string message = 4;
 }
 
 service CoralWordService {
-  rpc QueryWord(WordRequest) returns (WordDesc);
+  rpc QueryWord(WordRequest) returns (WordDescList);
 }

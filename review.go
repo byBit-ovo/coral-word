@@ -30,6 +30,7 @@ type ReviewItem struct {
 	Stat        *LearningStat
 	WordDesc    *wordDesc // 复习时需要展示的单词详情
 	ScheduledAt int       // 轮次 (1,2,3...)
+	Submitted   bool      // 是否已提交
 }
 
 const (
@@ -53,15 +54,19 @@ type ReviewSession struct {
 
 func StartReview(sid string, bookName string) map[string]bool {
 	uid, err := redisClient.GetUserSession(sid)
+	if err != nil || uid == "" {
+		log.Fatal(err)
+	}
+	// bookId, err := redisClient.GetUserBookId(uid, bookName)
+	review, err := GetReview(uid, bookName, 10)
 	if err != nil {
 		log.Fatal(err)
 	}
-	bookId, err := redisClient.GetUserBookId(uid, bookName)
-	review, err := GetReview(uid, bookId, 10)
-	if err != nil {
-		log.Fatal(err)
+	fmt.Println("开始复习，共有", len(review.ReviewQueue), "个单词")
+	for i, item := range review.ReviewQueue {
+		fmt.Println(i, item.WordDesc.Word)
 	}
-	for thisTurn := review.GetNext(); thisTurn != nil; thisTurn = review.GetNext() {
+	for thisTurn, err := review.GetNext(); err == nil; thisTurn, err = review.GetNext() {
 		fmt.Println(thisTurn.WordDesc.Word)
 		fmt.Println("0.认识 1.不认识 2.猜一猜")
 		choose := 0
@@ -120,13 +125,16 @@ func GetReview(uid, bookName string, limit int) (*ReviewSession, error) {
 }
 
 // GetNext 获取下一题
-func (s *ReviewSession) GetNext() *ReviewItem {
+func (s *ReviewSession) GetNext() (*ReviewItem, error) {
 	if s.CurrentIdx >= len(s.ReviewQueue) {
-		return nil
+		return nil, errors.New("no more words")
+	}
+	if s.ReviewQueue[s.CurrentIdx-1].Submitted == false{
+		return nil, errors.New("please submit the answer first")
 	}
 	item := s.ReviewQueue[s.CurrentIdx]
 	s.CurrentIdx++
-	return item
+	return item, nil
 }
 
 // SubmitAnswer 提交并更新进度（SM-2 算法）
@@ -140,6 +148,7 @@ func (s *ReviewSession) SubmitAnswer(item *ReviewItem, isCorrect bool) {
 	if s.ReviewQueue[len(s.ReviewQueue)-1] == item {
 		s.Status = REVIEW_OVER
 	}
+	item.Submitted = true
 }
 
 // updateSM2 实现标准 SM-2 间隔重复算法
