@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -17,18 +19,18 @@ type apiResponse struct {
 func RunHTTPServer(addr string) error {
 	router := gin.Default()
 
-	router.POST("/login", Login)
-	router.POST("/register", Register)
-	router.GET("/word", WordQuery)
-	router.POST("/create_note", CreateNote)
-	router.PUT("/update_note", UpdateNote)
-	router.GET("/get_note", GetNote)
-	router.DELETE("/delete_note", DeleteNote)
-	router.POST("/create_note_book", CreateNoteBookApi)
-	router.POST("/add_word_to_notebook", AddWordToNotebookApi)
-	router.POST("/review/start", ReviewStart)
-	router.GET("/review/next", NextReview)
-	router.POST("/review/submit", SubmitReview)
+	router.POST("/coral/login", Login)
+	router.POST("/coral/register", Register)
+	router.GET("/coral/word", WordQuery)
+	router.POST("/coral/create_note", CreateNote)
+	router.PUT("/coral/update_note", UpdateNote)
+	router.GET("/coral/get_note", GetNote)
+	router.DELETE("/coral/delete_note", DeleteNote)
+	router.POST("/coral/create_note_book", CreateNoteBookApi)
+	router.POST("/coral/add_word_to_notebook", AddWordToNotebookApi)
+	router.POST("/coral/review/start", ReviewStart)
+	router.GET("/coral/review/next", NextReview)
+	router.POST("/coral/review/submit", SubmitReview)
 
 	return router.Run(addr)
 }
@@ -84,6 +86,26 @@ func Register(c *gin.Context) {
 }
 
 func WordQuery(c *gin.Context) {
+	// 输出完整 HTTP 请求报文到控制台
+	// req := c.Request
+	// // 请求行：Method RequestURI Proto
+	// fmt.Println("-------- HTTP Request --------")
+	// fmt.Printf("%s %s %s\n", req.Method, req.URL.RequestURI(), req.Proto)
+	// for k, v := range req.Header {
+	// 	for _, vv := range v {
+	// 		fmt.Printf("%s: %s\n", k, vv)
+	// 	}
+	// }
+	// if req.Body != nil {
+		// body, _ := io.ReadAll(req.Body)
+	// 	req.Body = io.NopCloser(bytes.NewBuffer(body)) // 恢复 Body 供后续使用
+	// 	if len(body) > 0 {
+	// 		fmt.Println()
+	// 		fmt.Println(string(body))
+	// 	}
+	// }
+	// fmt.Println("------------------------------")
+
 	word := strings.TrimSpace(c.Query("word"))
 	if word == "" {
 		respondError(c, http.StatusBadRequest, "word is empty")
