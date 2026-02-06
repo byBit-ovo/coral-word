@@ -377,6 +377,199 @@ func (x *WordDescList) GetMessage() string {
 	return ""
 }
 
+// --- LLM 服务（Python 提供，Go 调用）---
+type WordDefinitionsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Words         []string               `protobuf:"bytes,1,rep,name=words,proto3" json:"words,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WordDefinitionsRequest) Reset() {
+	*x = WordDefinitionsRequest{}
+	mi := &file_proto_coral_word_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WordDefinitionsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WordDefinitionsRequest) ProtoMessage() {}
+
+func (x *WordDefinitionsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coral_word_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WordDefinitionsRequest.ProtoReflect.Descriptor instead.
+func (*WordDefinitionsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_coral_word_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *WordDefinitionsRequest) GetWords() []string {
+	if x != nil {
+		return x.Words
+	}
+	return nil
+}
+
+type WordDefinitionsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Words         []*WordDesc            `protobuf:"bytes,1,rep,name=words,proto3" json:"words,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *WordDefinitionsResponse) Reset() {
+	*x = WordDefinitionsResponse{}
+	mi := &file_proto_coral_word_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *WordDefinitionsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*WordDefinitionsResponse) ProtoMessage() {}
+
+func (x *WordDefinitionsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coral_word_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use WordDefinitionsResponse.ProtoReflect.Descriptor instead.
+func (*WordDefinitionsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_coral_word_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *WordDefinitionsResponse) GetWords() []*WordDesc {
+	if x != nil {
+		return x.Words
+	}
+	return nil
+}
+
+type ArticleRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Words         []string               `protobuf:"bytes,1,rep,name=words,proto3" json:"words,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArticleRequest) Reset() {
+	*x = ArticleRequest{}
+	mi := &file_proto_coral_word_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArticleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArticleRequest) ProtoMessage() {}
+
+func (x *ArticleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coral_word_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArticleRequest.ProtoReflect.Descriptor instead.
+func (*ArticleRequest) Descriptor() ([]byte, []int) {
+	return file_proto_coral_word_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ArticleRequest) GetWords() []string {
+	if x != nil {
+		return x.Words
+	}
+	return nil
+}
+
+type ArticleResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Error         string                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	Article       string                 `protobuf:"bytes,2,opt,name=article,proto3" json:"article,omitempty"`
+	ArticleCn     string                 `protobuf:"bytes,3,opt,name=article_cn,json=articleCn,proto3" json:"article_cn,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ArticleResponse) Reset() {
+	*x = ArticleResponse{}
+	mi := &file_proto_coral_word_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ArticleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ArticleResponse) ProtoMessage() {}
+
+func (x *ArticleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_coral_word_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ArticleResponse.ProtoReflect.Descriptor instead.
+func (*ArticleResponse) Descriptor() ([]byte, []int) {
+	return file_proto_coral_word_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ArticleResponse) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+func (x *ArticleResponse) GetArticle() string {
+	if x != nil {
+		return x.Article
+	}
+	return ""
+}
+
+func (x *ArticleResponse) GetArticleCn() string {
+	if x != nil {
+		return x.ArticleCn
+	}
+	return ""
+}
+
 var File_proto_coral_word_proto protoreflect.FileDescriptor
 
 const file_proto_coral_word_proto_rawDesc = "" +
@@ -421,9 +614,24 @@ const file_proto_coral_word_proto_rawDesc = "" +
 	"\amessage\x18\x04 \x01(\tR\amessage\x1aR\n" +
 	"\x0eWordDescsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12*\n" +
-	"\x05value\x18\x02 \x01(\v2\x14.coral_word.WordDescR\x05value:\x028\x012R\n" +
+	"\x05value\x18\x02 \x01(\v2\x14.coral_word.WordDescR\x05value:\x028\x01\".\n" +
+	"\x16WordDefinitionsRequest\x12\x14\n" +
+	"\x05words\x18\x01 \x03(\tR\x05words\"E\n" +
+	"\x17WordDefinitionsResponse\x12*\n" +
+	"\x05words\x18\x01 \x03(\v2\x14.coral_word.WordDescR\x05words\"&\n" +
+	"\x0eArticleRequest\x12\x14\n" +
+	"\x05words\x18\x01 \x03(\tR\x05words\"`\n" +
+	"\x0fArticleResponse\x12\x14\n" +
+	"\x05error\x18\x01 \x01(\tR\x05error\x12\x18\n" +
+	"\aarticle\x18\x02 \x01(\tR\aarticle\x12\x1d\n" +
+	"\n" +
+	"article_cn\x18\x03 \x01(\tR\tarticleCn2R\n" +
 	"\x10CoralWordService\x12>\n" +
-	"\tQueryWord\x12\x17.coral_word.WordRequest\x1a\x18.coral_word.WordDescListB'Z%github.com/byBit-ovo/coral_word/pb;pbb\x06proto3"
+	"\tQueryWord\x12\x17.coral_word.WordRequest\x1a\x18.coral_word.WordDescList2\xac\x01\n" +
+	"\n" +
+	"LLMService\x12Z\n" +
+	"\x0fWordDefinitions\x12\".coral_word.WordDefinitionsRequest\x1a#.coral_word.WordDefinitionsResponse\x12B\n" +
+	"\aArticle\x12\x1a.coral_word.ArticleRequest\x1a\x1b.coral_word.ArticleResponseB'Z%github.com/byBit-ovo/coral_word/pb;pbb\x06proto3"
 
 var (
 	file_proto_coral_word_proto_rawDescOnce sync.Once
@@ -437,29 +645,38 @@ func file_proto_coral_word_proto_rawDescGZIP() []byte {
 	return file_proto_coral_word_proto_rawDescData
 }
 
-var file_proto_coral_word_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_proto_coral_word_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_proto_coral_word_proto_goTypes = []any{
-	(*WordRequest)(nil),  // 0: coral_word.WordRequest
-	(*Definition)(nil),   // 1: coral_word.Definition
-	(*Phrase)(nil),       // 2: coral_word.Phrase
-	(*WordDesc)(nil),     // 3: coral_word.WordDesc
-	(*WordDescList)(nil), // 4: coral_word.WordDescList
-	nil,                  // 5: coral_word.WordDesc.SelectedNotesEntry
-	nil,                  // 6: coral_word.WordDescList.WordDescsEntry
+	(*WordRequest)(nil),             // 0: coral_word.WordRequest
+	(*Definition)(nil),              // 1: coral_word.Definition
+	(*Phrase)(nil),                  // 2: coral_word.Phrase
+	(*WordDesc)(nil),                // 3: coral_word.WordDesc
+	(*WordDescList)(nil),            // 4: coral_word.WordDescList
+	(*WordDefinitionsRequest)(nil),  // 5: coral_word.WordDefinitionsRequest
+	(*WordDefinitionsResponse)(nil), // 6: coral_word.WordDefinitionsResponse
+	(*ArticleRequest)(nil),          // 7: coral_word.ArticleRequest
+	(*ArticleResponse)(nil),         // 8: coral_word.ArticleResponse
+	nil,                             // 9: coral_word.WordDesc.SelectedNotesEntry
+	nil,                             // 10: coral_word.WordDescList.WordDescsEntry
 }
 var file_proto_coral_word_proto_depIdxs = []int32{
-	1, // 0: coral_word.WordDesc.definitions:type_name -> coral_word.Definition
-	2, // 1: coral_word.WordDesc.phrases:type_name -> coral_word.Phrase
-	5, // 2: coral_word.WordDesc.selected_notes:type_name -> coral_word.WordDesc.SelectedNotesEntry
-	6, // 3: coral_word.WordDescList.word_descs:type_name -> coral_word.WordDescList.WordDescsEntry
-	3, // 4: coral_word.WordDescList.WordDescsEntry.value:type_name -> coral_word.WordDesc
-	0, // 5: coral_word.CoralWordService.QueryWord:input_type -> coral_word.WordRequest
-	4, // 6: coral_word.CoralWordService.QueryWord:output_type -> coral_word.WordDescList
-	6, // [6:7] is the sub-list for method output_type
-	5, // [5:6] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	1,  // 0: coral_word.WordDesc.definitions:type_name -> coral_word.Definition
+	2,  // 1: coral_word.WordDesc.phrases:type_name -> coral_word.Phrase
+	9,  // 2: coral_word.WordDesc.selected_notes:type_name -> coral_word.WordDesc.SelectedNotesEntry
+	10, // 3: coral_word.WordDescList.word_descs:type_name -> coral_word.WordDescList.WordDescsEntry
+	3,  // 4: coral_word.WordDefinitionsResponse.words:type_name -> coral_word.WordDesc
+	3,  // 5: coral_word.WordDescList.WordDescsEntry.value:type_name -> coral_word.WordDesc
+	0,  // 6: coral_word.CoralWordService.QueryWord:input_type -> coral_word.WordRequest
+	5,  // 7: coral_word.LLMService.WordDefinitions:input_type -> coral_word.WordDefinitionsRequest
+	7,  // 8: coral_word.LLMService.Article:input_type -> coral_word.ArticleRequest
+	4,  // 9: coral_word.CoralWordService.QueryWord:output_type -> coral_word.WordDescList
+	6,  // 10: coral_word.LLMService.WordDefinitions:output_type -> coral_word.WordDefinitionsResponse
+	8,  // 11: coral_word.LLMService.Article:output_type -> coral_word.ArticleResponse
+	9,  // [9:12] is the sub-list for method output_type
+	6,  // [6:9] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_proto_coral_word_proto_init() }
@@ -473,9 +690,9 @@ func file_proto_coral_word_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_coral_word_proto_rawDesc), len(file_proto_coral_word_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   11,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_proto_coral_word_proto_goTypes,
 		DependencyIndexes: file_proto_coral_word_proto_depIdxs,

@@ -3,10 +3,9 @@ package main
 import (
 	_ "encoding/json"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
-	_"sync"
+	_ "sync"
 
 	llm "github.com/byBit-ovo/coral_word/LLM"
 )
@@ -179,39 +178,88 @@ func TagsFromMask(mask int64) []string {
 
 	return tags
 }
+// func QueryWords(word ...string) (map[string]*wordDesc, error, []string) {
+//     wordsInMysql := make([]string, 0)
+//     wordsToQuery := make([]string, 0)
+//     for _, w := range word {
+//         if _, err := redisClient.HGetWord(w); err != nil {
+//             wordsToQuery = append(wordsToQuery, w)
+//         } else {
+//             wordsInMysql = append(wordsInMysql, w)
+//         }
+//     }
+//     res := make(map[string]*wordDesc)
+//     var err error
+//     if len(wordsInMysql) > 0 {
+//         res, err = selectWordsByNames(wordsInMysql...)
+//         if err != nil {
+//             return nil, err, wordsToQuery
+//         }
+//     }
+//     if len(wordsToQuery) > 0 {
+//         for _, w := range wordsToQuery {
+//             wordsMapInES, err := esClient.SearchWordDescFuzzy(w,10)
+//             if err != nil {
+//                 return nil, err, wordsToQuery
+//             }
+//             for word, wd := range wordsMapInES {
+//                 res[word] = wd
+//                 // delete words searched in ES
+//                 wordsToQuery = slices.DeleteFunc(wordsToQuery, func(w string) bool {
+//                     return w == word
+//                 })
+//             }
 
-func QueryWords(word ...string) (map[string]*wordDesc, error, []string) {
-	wordsInMysql := make([]string, 0)
-	wordsToQuery := make([]string, 0)
-	for _, w := range word {
-		if _, err := redisClient.HGetWord(w); err != nil {
-			wordsToQuery = append(wordsToQuery, w)
-		} else {
-			wordsInMysql = append(wordsInMysql, w)
+
+
+
+// oneWordResult 单次查词结果，供 singleflight 合并同一单词的并发请求
+type oneWordResult struct {
+	descs   map[string]*wordDesc // Redis+DB 或 ES 查到的结果（ES 模糊查到的多条也全部返回）
+	needLLM bool                 // 查询词未命中则需走 LLM 补全
+}
+
+// queryOneWord 查单个词：在 Redis 则从 DB 取；不在 Redis 则跳过 MySQL，直接 ES 模糊查询，查到的结果都作为最终结果返回
+func queryOneWord(w string) (*oneWordResult, error) {
+	// 1. 在 Redis 则从 DB 取详情
+	if _, err := redisClient.HGetWord(w); err == nil {
+		m, err := selectWordsByNames(w)
+		if err != nil {
+			return nil, err
+		}
+		if len(m) > 0 {
+			return &oneWordResult{descs: m}, nil
 		}
 	}
+	// 2. 不在 Redis 则跳过 MySQL，直接 ES 模糊查询；查到的结果全部作为最终结果返回
+	wordsMapInES, err := esClient.SearchWordDescFuzzy(w, 10)
+	if err != nil {
+		return nil, err
+	}
+	_, exactHit := wordsMapInES[w]
+	return &oneWordResult{
+		descs:   wordsMapInES,
+		needLLM: !exactHit, // 精确词未命中则需 LLM
+	}, nil
+}
+
+func QueryWords(words ...string) (map[string]*wordDesc, error, []string) {
 	res := make(map[string]*wordDesc)
-	var err error
-	if len(wordsInMysql) > 0 {
-		res, err = selectWordsByNames(wordsInMysql...)
+	wordsToQuery := make([]string, 0)
+
+	for _, w := range words {
+		v, err, _ := wordQueryGroup.Do(w, func() (interface{}, error) {
+			return queryOneWord(w)
+		})
 		if err != nil {
 			return nil, err, wordsToQuery
 		}
-	}
-	if len(wordsToQuery) > 0 {
-		for _, w := range wordsToQuery {
-			wordsMapInES, err := esClient.SearchWordDescFuzzy(w,10)
-			if err != nil {
-				return nil, err, wordsToQuery
-			}
-			for word, wd := range wordsMapInES {
-				res[word] = wd
-				// delete words searched in ES
-				wordsToQuery = slices.DeleteFunc(wordsToQuery, func(w string) bool {
-					return w == word
-				})
-			}
-
+		r := v.(*oneWordResult)
+		for word, desc := range r.descs {
+			res[word] = desc
+		}
+		if r.needLLM {
+			wordsToQuery = append(wordsToQuery, w)
 		}
 	}
 	// 一般在这里要剔除掉wordsToQuery中不合法的单词，防止滥用大模型API

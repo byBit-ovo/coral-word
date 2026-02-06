@@ -76,6 +76,8 @@ GRPC_ADDR=0.0.0.0:50051 HTTP_ADDR=0.0.0.0:8080 go run .
 
 **etcd（gRPC 服务注册）**：配置 `ETCD_ENDPOINTS`、`ETCD_SERVICE_NAME` 后，gRPC 地址会注册到 etcd。
 
+**Nginx 反向代理**：若需对外 80 端口或配合域名部署，见 [nginx/README.md](nginx/README.md)。
+
 ---
 
 ## 简历一句话示例

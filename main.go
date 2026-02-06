@@ -3,7 +3,6 @@ package main
 import (
 	_ "bufio"
 	_ "bytes"
-	_ "context"
 	_ "database/sql"
 	_ "encoding/json"
 	"fmt"
@@ -14,7 +13,6 @@ import (
 	_ "strconv"
 	"time"
 	_ "time"
-	"context"
 	"bufio"
 
 	"github.com/byBit-ovo/coral_word/LLM"
@@ -105,28 +103,28 @@ const(
 func main() {
 	//"64a3a609-85d3-44ff-8f41-4efcd7a4a975"
 	defer LLMPool.Shutdown()
-	// go RunHTTPServer(os.Getenv("HTTP_ADDR"))
-	go RunGrpcServer(os.Getenv("GRPC_ADDR"))
-	grcpClient, err := NewCoralWordGrpcClient()
-	if err != nil {
-		log.Fatalf("failed to create grpc client: %v", err)
-	}
-	for true{
-		var word string
-		fmt.Scan(&word)
-		word_descs, err := grcpClient.QueryWord(context.Background(), word)
-		if err != nil {
-			log.Fatalf("failed to query word: %v", err)
-		}
-		if word_descs.Err != "false" {
-			log.Println(word_descs.Message)
-			continue
-		} 
-		for _, word_desc := range word_descs.GetWordDescs() {
-			FromPbWordDesc(word_desc).show()
-		}
+	RunHTTPServer(os.Getenv("HTTP_ADDR"))
+	// go RunGrpcServer(os.Getenv("GRPC_ADDR"))
+	// grcpClient, err := NewCoralWordGrpcClient()
+	// if err != nil {
+	// 	log.Fatalf("failed to create grpc client: %v", err)
+	// }
+	// for true{
+	// 	var word string
+	// 	fmt.Scan(&word)
+	// 	word_descs, err := grcpClient.QueryWord(context.Background(), word)
+	// 	if err != nil {
+	// 		log.Fatalf("failed to query word: %v", err)
+	// 	}
+	// 	if word_descs.Err != "false" {
+	// 		log.Println(word_descs.Message)
+	// 		continue
+	// 	} 
+	// 	for _, word_desc := range word_descs.GetWordDescs() {
+	// 		FromPbWordDesc(word_desc).show()
+	// 	}
 
-	}
+	// }
 	// StartReview("ab7b3f22-861f-4288-b8f5-46676bb0042a","我的生词本")
 	// RyanQi := &User{
 	// 	Name: "RyanQi",	

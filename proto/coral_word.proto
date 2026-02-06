@@ -43,3 +43,27 @@ message WordDescList{
 service CoralWordService {
   rpc QueryWord(WordRequest) returns (WordDescList);
 }
+
+// --- LLM 服务（Python 提供，Go 调用）---
+message WordDefinitionsRequest {
+  repeated string words = 1;
+}
+
+message WordDefinitionsResponse {
+  repeated WordDesc words = 1;
+}
+
+message ArticleRequest {
+  repeated string words = 1;
+}
+
+message ArticleResponse {
+  string error = 1;
+  string article = 2;
+  string article_cn = 3;
+}
+
+service LLMService {
+  rpc WordDefinitions(WordDefinitionsRequest) returns (WordDefinitionsResponse);
+  rpc Article(ArticleRequest) returns (ArticleResponse);
+}
