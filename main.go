@@ -1,23 +1,13 @@
 package main
 
 import (
-	_ "bufio"
-	_ "bytes"
-	_ "database/sql"
-	_ "encoding/json"
 	"fmt"
 	"log"
-	_ "net/http"
 	"os"
-	_"strconv"
-	_ "strconv"
 	"time"
-	_ "time"
 	"bufio"
-
 	"github.com/byBit-ovo/coral_word/LLM"
 	"github.com/joho/godotenv"
-	_"golang.org/x/sync/singleflight"
 )
 
 func init() {

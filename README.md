@@ -49,7 +49,7 @@
 
 ---
 
-## 项目亮点（简历可写）
+## 项目亮点
 
 - **多存储协同**：Redis 缓存 + MySQL 主数据 + Elasticsearch 检索，读路径分层、写路径异步补全与补偿同步。
 - **高并发与稳定性**：协程池限制 LLM 并发、singleflight 防重复请求、复习会话内存锁 + 会话级状态机。
@@ -79,8 +79,5 @@ GRPC_ADDR=0.0.0.0:50051 HTTP_ADDR=0.0.0.0:8080 go run .
 **Nginx 反向代理**：若需对外 80 端口或配合域名部署，见 [nginx/README.md](nginx/README.md)。
 
 ---
-
-## 简历一句话示例
-
 **Coral Word（Go 后端）**  
 英语单词查询与复习系统：MySQL/Redis/ES 多源读写与缓存、LLM 生词补全、SM-2 间隔复习；Gin REST + gRPC 双协议，协程池与 singleflight 控制并发与缓存击穿；支持笔记本、笔记与复习会话管理。
