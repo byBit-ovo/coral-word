@@ -105,7 +105,6 @@ func WordQuery(c *gin.Context) {
 	// 	}
 	// }
 	// fmt.Println("------------------------------")
-
 	word := strings.TrimSpace(c.Query("word"))
 	if word == "" {
 		respondError(c, http.StatusBadRequest, "word is empty")
