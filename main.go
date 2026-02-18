@@ -89,11 +89,35 @@ func testSf(num *int64)error{
 const(
 	s1 = "hello"
 )
+func testDefer() int {
+	i := 0
+	defer func() {
+			fmt.Println("defer1")
+			fmt.Println(i)
+	}()
+	defer func() {
+			i += 1
+			fmt.Println("defer2")
+	}()
+	return i
+}
 
+type Person struct{
+	Name string
+	Age int
+}
 func main() {
+	fmt.Println("return", testDefer())
+	var p *Person
+	p = &Person{
+		Name: "John",
+		Age: 20,
+	}
+	fmt.Println(p.Name, p.Age)
+	
 	//"64a3a609-85d3-44ff-8f41-4efcd7a4a975"
-	defer LLMPool.Shutdown()
-	RunHTTPServer(os.Getenv("HTTP_ADDR"))
+	// defer LLMPool.Shutdown()
+	// RunHTTPServer(os.Getenv("HTTP_ADDR"))
 	// go RunGrpcServer(os.Getenv("GRPC_ADDR"))
 	// grcpClient, err := NewCoralWordGrpcClient()
 	// if err != nil {

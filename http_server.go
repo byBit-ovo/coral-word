@@ -1,9 +1,7 @@
 package main
 
 import (
-	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 
@@ -105,6 +103,7 @@ func WordQuery(c *gin.Context) {
 	// 	}
 	// }
 	// fmt.Println("------------------------------")
+	
 	word := strings.TrimSpace(c.Query("word"))
 	if word == "" {
 		respondError(c, http.StatusBadRequest, "word is empty")
