@@ -107,14 +107,9 @@ type Person struct{
 	Age int
 }
 func main() {
-	fmt.Println("return", testDefer())
-	var p *Person
-	p = &Person{
-		Name: "John",
-		Age: 20,
-	}
-	fmt.Println(p.Name, p.Age)
-	
+
+	fmt.Println(4/3)
+	fmt.Println(4/3)
 	//"64a3a609-85d3-44ff-8f41-4efcd7a4a975"
 	// defer LLMPool.Shutdown()
 	// RunHTTPServer(os.Getenv("HTTP_ADDR"))
