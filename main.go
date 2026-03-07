@@ -107,13 +107,10 @@ type Person struct{
 	Age int
 }
 func main() {
-
-	fmt.Println(4/3)
-	fmt.Println(4/3)
 	
 	//"64a3a609-85d3-44ff-8f41-4efcd7a4a975"
 	// defer LLMPool.Shutdown()
-	// RunHTTPServer(os.Getenv("HTTP_ADDR"))
+	RunHTTPServer(os.Getenv("HTTP_ADDR"))
 	// go RunGrpcServer(os.Getenv("GRPC_ADDR"))
 	// grcpClient, err := NewCoralWordGrpcClient()
 	// if err != nil {
