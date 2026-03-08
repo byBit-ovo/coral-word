@@ -9,6 +9,7 @@ type ArticleDesc struct {
 }
 
 
+
 func (atc *ArticleDesc) show(){
 	fmt.Println("E.G.")
 	fmt.Println(atc.Article)
