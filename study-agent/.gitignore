@@ -1,0 +1,5 @@
+# runtime data
+data/
+
+# local build outputs
+study-agent

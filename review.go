@@ -14,6 +14,9 @@ const (
 	NO_PENDING_REVIEWS = "no pending reviews for today"
 )
 
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 
 // LearningStat 对应 DB 记录，包含 SM-2 算法所需核心数据
@@ -129,7 +132,7 @@ func (s *ReviewSession) GetNext() (*ReviewItem, error) {
 	if s.CurrentIdx >= len(s.ReviewQueue) {
 		return nil, errors.New("no more words")
 	}
-	if s.ReviewQueue[s.CurrentIdx-1].Submitted == false{
+	if s.CurrentIdx > 0 && s.ReviewQueue[s.CurrentIdx-1].Submitted == false {
 		return nil, errors.New("please submit the answer first")
 	}
 	item := s.ReviewQueue[s.CurrentIdx]
@@ -137,18 +140,30 @@ func (s *ReviewSession) GetNext() (*ReviewItem, error) {
 	return item, nil
 }
 
-// SubmitAnswer 提交并更新进度（SM-2 算法）
-// isCorrect: true=认识 -> q=4, false=不认识 -> q=1
-func (s *ReviewSession) SubmitAnswer(item *ReviewItem, isCorrect bool) {
-	quality := 1 // 不认识 -> q=1
-	if isCorrect {
-		quality = 4 // 认识 -> q=4
+// SubmitAnswerByQuality 提交并更新进度（SM-2 算法）
+// quality: 0-5，越大表示掌握越好
+func (s *ReviewSession) SubmitAnswerByQuality(item *ReviewItem, quality int) error {
+	if quality < 0 || quality > 5 {
+		return errors.New("quality must be in [0,5]")
+	}
+	if item.Submitted {
+		return errors.New("answer already submitted")
 	}
 	updateSM2(item.Stat, quality)
 	if s.ReviewQueue[len(s.ReviewQueue)-1] == item {
 		s.Status = REVIEW_OVER
 	}
 	item.Submitted = true
+	return nil
+}
+
+// SubmitAnswer 保持兼容：true=认识(q=4), false=不认识(q=1)
+func (s *ReviewSession) SubmitAnswer(item *ReviewItem, isCorrect bool) {
+	quality := 1
+	if isCorrect {
+		quality = 4
+	}
+	_ = s.SubmitAnswerByQuality(item, quality)
 }
 
 // updateSM2 实现标准 SM-2 间隔重复算法
@@ -187,7 +202,7 @@ func updateSM2(s *LearningStat, quality int) {
 	// 3. 设置下次复习时间（加随机抖动 ±10% 防止复习堆积）
 	jitter := 0.9 + rand.Float64()*0.2
 	days := float64(s.Interval) * jitter
-	s.NextReviewTime = time.Now().Add(time.Duration(days*24) * time.Hour)
+	s.NextReviewTime = time.Now().Add(time.Duration(days * 24 * float64(time.Hour)))
 }
 
 // generateQueue 生成复习队列：根据 EF 和 Repetitions 决定每个单词在 session 内出现次数，

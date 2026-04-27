@@ -29,6 +29,9 @@ func RunHTTPServer(addr string) error {
 	router.POST("/coral/review/start", ReviewStart)
 	router.GET("/coral/review/next", NextReview)
 	router.POST("/coral/review/submit", SubmitReview)
+	router.POST("/coral/assistant/due_words", AssistantDueWords)
+	router.POST("/coral/assistant/reading/recommend", AssistantReadingRecommend)
+	router.POST("/coral/assistant/chat", AssistantChat)
 
 	return router.Run(addr)
 }
@@ -95,7 +98,7 @@ func WordQuery(c *gin.Context) {
 	// 	}
 	// }
 	// if req.Body != nil {
-		// body, _ := io.ReadAll(req.Body)
+	// body, _ := io.ReadAll(req.Body)
 	// 	req.Body = io.NopCloser(bytes.NewBuffer(body)) // 恢复 Body 供后续使用
 	// 	if len(body) > 0 {
 	// 		fmt.Println()
@@ -103,7 +106,7 @@ func WordQuery(c *gin.Context) {
 	// 	}
 	// }
 	// fmt.Println("------------------------------")
-	
+
 	word := strings.TrimSpace(c.Query("word"))
 	if word == "" {
 		respondError(c, http.StatusBadRequest, "word is empty")
@@ -255,7 +258,7 @@ func CreateNoteBookApi(c *gin.Context) {
 	if err != nil {
 		respondError(c, http.StatusInternalServerError, err.Error())
 		return
-	}	
+	}
 	user := &User{
 		Id:        uid,
 		SessionId: req.SessionId,
@@ -351,8 +354,8 @@ func NextReview(c *gin.Context) {
 	redisClient.SetReviewSession(sessionID, session)
 	respondOK(c, gin.H{
 		"next_index": session.CurrentIdx,
-		"word":  item.WordDesc.Word,
-		"done":  false,
+		"word":       item.WordDesc.Word,
+		"done":       false,
 	})
 }
 
@@ -362,6 +365,7 @@ func SubmitReview(c *gin.Context) {
 		SessionId string `json:"session_id"`
 		Index     int    `json:"index"`
 		Correct   bool   `json:"correct"`
+		Quality   *int   `json:"quality,omitempty"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		respondError(c, http.StatusBadRequest, "invalid request body")
@@ -384,8 +388,28 @@ func SubmitReview(c *gin.Context) {
 		respondError(c, http.StatusBadRequest, "invalid index")
 		return
 	}
+	// 强制顺序提交：只能提交上一道由 NextReview 发出的题目
+	expected := session.CurrentIdx - 1
+	if req.Index != expected {
+		respondError(c, http.StatusBadRequest, "invalid submit order")
+		return
+	}
 	item := session.ReviewQueue[req.Index]
-	session.SubmitAnswer(item, req.Correct)
+	if item.Submitted {
+		respondError(c, http.StatusBadRequest, "answer already submitted")
+		return
+	}
+	quality := 1
+	if req.Correct {
+		quality = 4
+	}
+	if req.Quality != nil {
+		quality = *req.Quality
+	}
+	if err := session.SubmitAnswerByQuality(item, quality); err != nil {
+		respondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	if session.Status == REVIEW_OVER {
 		if err := session.saveProgress(); err != nil {
 			respondError(c, http.StatusInternalServerError, err.Error())
@@ -398,8 +422,8 @@ func SubmitReview(c *gin.Context) {
 	}
 	// 更新 session 到 Redis
 	redisClient.SetReviewSession(req.SessionId, session)
-	respondOK(c, gin.H{"next_index": session.CurrentIdx, 
-	"word": item.WordDesc, "done": false})
+	respondOK(c, gin.H{"next_index": session.CurrentIdx,
+		"word": item.WordDesc, "done": false})
 }
 
 func respondOK(c *gin.Context, data interface{}) {

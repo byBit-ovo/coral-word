@@ -108,6 +108,21 @@ type Person struct{
 }
 func main() {
 	
+	// for true{
+	// 	var word string
+	// 	fmt.Scan(&word)
+	// 	word_descs, err := grcpClient.QueryWord(context.Background(), word)
+	// 	if err != nil {
+	// 		log.Fatalf("failed to query word: %v", err)
+	// 	}
+	// 	if word_descs.Err != "false" {
+	// 		log.Println(word_descs.Message)
+	// 		continue
+	// 	} 
+	// 	for _, word_desc := range word_descs.GetWordDescs() {
+	// 		FromPbWordDesc(word_desc).show()
+	// 	}
+	// }
 	//"64a3a609-85d3-44ff-8f41-4efcd7a4a975"
 	// defer LLMPool.Shutdown()
 	// RunHTTPServer(os.Getenv("HTTP_ADDR"))
